@@ -1,7 +1,7 @@
 import { ChartSection } from "../components/ChartSection";
 import { Slider } from "../components/FeaturedCandidate";
 import { Footer } from "../components/Footer";
-import { Header } from "../components/header"
+import { Header } from "../components/Header"
 import { MapAndData } from "../components/MapAndData";
 import { NepalMap } from "../components/NepalMap";
 
