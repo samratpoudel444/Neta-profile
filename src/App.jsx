@@ -1,14 +1,11 @@
-import './App.css'
+import "./App.css";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { HomePage } from './userSite/pages/HomePage';
-import { SearchCandidatePage } from './userSite/pages/searchCandidatePage';
-import { CompareCandidate } from './userSite/pages/CompareCandidate';
-import { OldElectionPage } from './userSite/pages/oldElectionPage';
-
+import { HomePage } from "./userSite/pages/HomePage";
+import { SearchCandidatePage } from "./userSite/pages/searchCandidatePage";
+import { CompareCandidate } from "./userSite/pages/CompareCandidate";
+import { OldElectionPage } from "./userSite/pages/OldElectionPage";
 
 function App() {
-
-
   return (
     <Router>
       <Routes>
@@ -27,4 +24,4 @@ function App() {
   );
 }
 
-export default App
+export default App;
