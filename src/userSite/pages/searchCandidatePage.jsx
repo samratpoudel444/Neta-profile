@@ -1,5 +1,5 @@
-import { Footer } from "../components/footer"
-import { Header } from "../components/header"
+import { Footer } from "../components/Footer"
+import { Header } from "../components/Header"
 import { SearchBar } from "../components/SearchBar";
 import { SearchProvider } from "../../helper/SearchContext"
 import { DisplayResults } from "../components/DisplayResults";
