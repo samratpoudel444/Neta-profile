@@ -1,712 +1,1901 @@
-# MediGo — Repository Assessment, Technical Complexity, LOC Sizing & Commercial Valuation
-
-| Item | Value |
-|---|---|
-| Assessment date | 2026-10-24 |
-| Repository | MediGo — `https://github.com/samratpoudel444/MediGo.git` |
-| Commit assessed | `f32b2fe1` ("new frontend fixes", 2026-10-13), branch `main` |
-| Methodology | *Repository Valuation Methodology: Google-Calibrated, 23-Topic Framework* (as pasted; the brief was truncated after §17.9, so §18–23 follow its evident structure) |
-| Tools | cloc 2.10 · gitleaks 8.30.1 · node 22.23.2 · npm 10.9.8 · python3 (classification script) |
-| Method of verification | Full read of every backend source file and the key frontend files; `git archive HEAD` extracted to a scratch directory where `npm ci / install`, ESLint, Jest, `vite build` and a server boot were executed. The working tree was **not** modified. MongoDB, Redis, Cloudinary, OCR.space, Gemini and Gmail were **not** available, so no live request flow was demonstrated. |
-
-Legend used throughout: **VERIFIED** = observed directly in the repository or by executing it · **NOT VERIFIED** = plumbing present but not exercised · **UNKNOWN / NOT AVAILABLE** = evidence absent.
-
----
-
-## SECTION 1 — BASIC REPOSITORY PROFILE
-
-| Attribute | Finding |
-|---|---|
-| Repository name | MediGo ("Smart Medical Prescription And Consultation System") |
-| Primary languages | JavaScript (ES modules) and JSX |
-| Frameworks | Backend: Express 5.2, Mongoose 8.14, Socket.IO 4.8, node-cron 4, pino 10. Frontend: React 19.1, Vite 6.3, MUI 7.1, Tailwind CSS 4.1, TanStack Query 5, Formik 2, react-leaflet 5, Chart.js 4 |
-| Platforms | Web: Node 24 server (Dockerfile) + browser SPA |
-| Application type | Two-app monorepo: REST/WebSocket API + single-page web client. Domain: healthcare appointments, prescriptions, pharmacies |
-| Tracked files | 240 (`git ls-files`) |
-| Source files | 193 logic files (backend 106 `.js`, frontend 87 `.jsx`/`.js`) |
-| Test files | 2 (`backend/server/test/signUp.test.js`, `frontend/test/login.spec.js`) |
-| Source LOC | 11,726 code lines (backend 3,068 · frontend 8,658) |
-| Test LOC | 114 |
-| Total relevant LOC | 11,854 (source + test + 14 markup) |
-| Modules | 2 applications. Backend: 10 route modules, 9 Mongoose models, 6 middleware, 7 helpers, 2 cron schedulers, 1 Socket.IO server, 1 seed, 1 data-import script. Frontend: 87 components across 10 feature folders (Admin, DoctorDashboard, Blogs, ChatApp, maps, modal, chart, utils, …) |
-| Packages | 2 npm packages (`backend`, `frontend`) |
-| Major components | Auth/OTP, Admin, Doctor, Patient, Appointments + priority scheduler, Prescription OCR, Pharmacy/geo, Chat, Blogs, Reminders |
-| Build system | npm scripts; Vite for frontend; Babel (`babel.config.cjs`) for Jest; multi-stage `backend/Dockerfile`; GitHub Actions in `backend/.github/workflows/backend-ci.yml` and `frontend/.github/workflows/frontend-ci.yml`; husky pre-commit + lint-staged; ESLint 9 flat configs |
-| Configuration files | `backend/.env` (tracked), `backend/.env.example`, `backend/server/config/env.js` (yup-validated), `backend/server/config/rate_limiter.js`, `frontend/vite.config.js`, `frontend/playwright.config.js`, two `eslint.config.js`, `.gitignore`, `.gitignore.backup` (UTF-16), `backend/.gitIgnore`, `backend/.dockerignore` |
-| Database | MongoDB (Mongoose). Redis for OTP storage, socket-id presence map, medicine-name cache |
-| APIs | ~50 REST endpoints under `/api/v1` (auth, admin, doctor, patient, appointment, pharmacy, chat, blog, reminder). Socket.IO event `chat-message` |
-| UI | React SPA with role-gated areas: `/admin/*`, `/doctor/*`, patient routes, `/chat` |
-| Background processing | `node-cron`: appointment priority / slot assignment (`FILTER_DOCTOR_SCHEDULER`), medicine reminders mailer (`CRON_REMAINDER`) |
-| External integrations | Cloudinary (image store), OCR.space (OCR), Google Gemini (`@google/generative-ai`), Gmail SMTP via Nodemailer, RxNav/NLM (medicine list import), OpenStreetMap tiles, iconfinder CDN icons |
-| Executable entry points | `backend/index.js` (`npm start` / `npm run dev`), `frontend/src/main.jsx` (`vite`), `backend/server/db/seeding/adminSeeding.js` (`npm run seedAdmin`), `backend/server/db/migration/medicineMigration.js` (`npm run migrateMedicine`) |
-
-LOC is used only for size eligibility (Section 2) and the LOC factor (Section 17.3), never for complexity.
-
----
-
-## SECTION 2 — REPOSITORY SIZE ELIGIBILITY
-
-Counting basis: `git ls-files` only; cloc 2.10 with explicit per-category file lists produced by a script applying the §17.1 regex rules in order (EXCLUDE_DIRS → EXCLUDE_GEN → TEST → LOGIC → MARKUP).
-
-### 2.1 Raw count (`cloc --vcs=git`)
-
-| Language | Files | Code |
-|---|--:|--:|
-| JSON | 4 | 15,955 |
-| JSX | 89 | 8,658 |
-| JavaScript | 111 | 3,302 |
-| YAML | 2 | 82 |
-| Markdown | 2 | 61 |
-| Dockerfile | 1 | 15 |
-| HTML | 1 | 13 |
-| SVG | 3 | 13 |
-| Bourne Shell | 1 | 3 |
-| CSS | 1 | 1 |
-| **Total** | **215** | **28,103** |
-
-### 2.2 Mechanical classification
-
-| Rule | Files | Code lines | Files affected |
-|---|--:|--:|---|
-| LOGIC (production) | 193 | 11,726 | all `.js/.jsx` under `backend/` and `frontend/src/` |
-| TEST | 2 | 114 | `backend/server/test/signUp.test.js`, `frontend/test/login.spec.js` |
-| MARKUP | 3 | 14 | `frontend/index.html` (13), `frontend/src/App.css` (1), `frontend/src/index.css` (0) |
-| EXCLUDE_GEN | 6 | 15,897 | `backend/package-lock.json` (15,777), `babel.config.cjs`, both `eslint.config.js`, `playwright.config.js`, `vite.config.js` |
-| EXCLUDE_DIRS (`.github`) | 2 | 82 | two CI workflows |
-| Other (config/docs/assets/data) | 34 | 270 | READMEs, package.json ×2, Dockerfile, `.env*`, `roadGraph.json`, 17 images, dotfiles |
-
-### 2.3 Supplementary checks
-
-- **Foreign packages / vendored source:** none. No `third_party`, `vendor`, submodules, or copied libraries.
-- **Embedded data:** five logic files have ≥300 code lines (`location.jsx` 431, `usableNavbar.jsx` 369, `PrescriptionUpload.jsx` 309, `CreateDoctor.jsx` 305, `UserDoctorRegistrationPage.jsx` 303); the highest share of lines containing a string literal is 47 % (< 70 % threshold). None excluded.
-- **Generator scripts / generated models:** none found.
-- **Test-pattern review:** only the two test directories; no production package is misnamed as a test.
-- **Duplicates D1** (identical after whitespace/import normalisation, ≥10 lines): **none**. Nine *near*-duplicate pairs exist (Section 11) and remain in L per the rules.
-- **D2:** not applicable (single application, no sibling services or forks).
-
-### 2.4 Effective LOC
-
-| Category | LOC |
-|---|--:|
-| Raw tracked code | 28,103 |
-| Production logic LOC — JSX | 8,658 |
-| Production logic LOC — JavaScript | 3,068 |
-| **Production logic total** | **11,726** |
-| Vendored / third-party LOC (excluded) | 0 |
-| Test LOC (excluded) | 114 (test-to-production ratio **0.97 %**) |
-| Embedded data LOC (excluded) | 0 |
-| Generated LOC (excluded) | 0 (120 LOC of tool config excluded by EXCLUDE_GEN) |
-| Duplicated LOC (excluded, D1/D2) | 0 |
-| Authored markup LOC | 14 → × 0.5 = 7 |
-| Configuration & documentation LOC (excluded) | 16,249 |
-| **Effective LOC (L)** | **11,733** |
-
-**Vendor Size Eligibility (1,000 ≤ L ≤ 500,000): PASS.**
-The vendor's exact counting methodology is UNKNOWN; if it counts raw lines (28,103) or excludes JSX markup differently the figure changes but eligibility does not.
-
----
-
-## SECTION 3 — END-TO-END APPLICATION ASSESSMENT
-
-### 3.1 Actual execution flow
-
-```
-USER (browser, React SPA; Formik/yup client validation)
-  ↓ axios (Bearer token read from localStorage; baseURL hard-coded http://localhost:3000)
-EXPRESS ENTRY  backend/index.js
-  ↓ cors(allow-list localhost:5173/5174) → helmet → express.json(100kb) → cookieParser → global rate limiter
-ROUTER  /api/v1/*  (10 routers)
-  ↓ route-level limiter (login/register/forgot/otp) → authMiddleware (JWT verify) → isAdmin | isDoctor | isPatient
-  ↓ validateReqBody(yup) / validateMongoId / isOwnerOfAppointment (where wired)
-CONTROLLER  (one file per use case)
-  ↓ Mongoose model → MongoDB
-  ↓ side effects: Redis (OTP, presence, cache) · Cloudinary upload · Nodemailer · Socket.IO emit
-RESPONSE  JSON {message|data}  — or next({code,message}) → errorMiddleware
-  ↓
-UI  TanStack Query cache → MUI/Tailwind components → react-toastify
-BACKGROUND  node-cron → FilterDoctors() priority sort → AppointmentTable.findOneAndUpdate
-            node-cron → checkRemainder() → sendMailToUser()
-```
-
-Per-stage findings:
-
-| Stage | Evidence | Status |
-|---|---|---|
-| Entry point | `backend/index.js` mounts 10 routers, error handler, listens on `config.PORT` | VERIFIED (boots) |
-| Input | React forms (Formik + yup), multer for images | VERIFIED (code) |
-| Validation | `env.js` (3 vars), `userValidation.js`, `pharmacyValidation.js`, `appointmentValidation.js`, `passwordValidation.js`; `validateReqBody` middleware is defined but only partially used | VERIFIED (code) |
-| Business logic | role gating, doctor approval, appointment uniqueness + priority rules, OTP reset | VERIFIED (code) |
-| Data processing | Jimp image preprocessing → OCR → regex extraction; Haversine distance; Mongo aggregations | VERIFIED (code) |
-| Persistence | 9 Mongoose schemas; Redis via `redisHelper.js` | NOT VERIFIED at runtime (no Mongo/Redis) |
-| External communication | Cloudinary, OCR.space, Gemini, SMTP, RxNav, Socket.IO | NOT VERIFIED (no credentials/services) |
-| Output | JSON responses; SPA views | VERIFIED (build) / NOT VERIFIED (runtime) |
-| Error handling | central `errorMiddleware.js` | VERIFIED **defective** (see 3.3) |
-| Configuration | `.env` + yup schema | VERIFIED (loads) |
-| Testing | 1 Jest file, 1 Playwright spec | VERIFIED (2 of 5 Jest tests fail) |
-| Build / run | npm scripts, Vite, Dockerfile, CI | VERIFIED partially (see 3.2) |
-
-### 3.2 Executability — what was actually run
-
-| Step | Command (scratch copy) | Result |
-|---|---|---|
-| Backend install | `npm ci --ignore-scripts` | OK, 1,124 packages |
-| Backend lint | `npx eslint .` | **FAIL** — `markAppointmentCompleted.js:24:22 'err' is not defined (no-undef)` |
-| Backend tests (with committed `.env`) | `npx jest --ci` | **2 failed, 3 passed** — expected `"User created sucessfully"` vs actual `"User created successfully"`; doctor-creation test: `DoctorTable.create` called 0 times |
-| Backend tests (without `.env`) | same | **Suite aborts**: `env.js` prints "Invalid environment configuration … MONGO_URI is required" and calls `process.exit(1)` |
-| Backend syntax | `node --check` on all 107 files | all pass (two *directories* are named `chatController.js/` and `blogController.js/`) |
-| Backend boot | `node index.js` | first attempt `EADDRINUSE :::5000` (hard-coded Socket.IO port, busy on this machine); after changing that port **in the scratch copy only**, logs `Server started port 3000`, then repeated `Redis Client Error` (no Redis); Mongo connection not established within 8 s |
-| Frontend install | `npm ci` | **FAIL** — no `package-lock.json` tracked; `npm install` succeeded (429 packages) |
-| Frontend lint | `npx eslint .` | OK (1 warning, `MessageBar.jsx:60` exhaustive-deps) |
-| Frontend build | `npx vite build` | **OK** in 6.0 s; main chunk 972.89 kB (warning >500 kB) |
-| Playwright e2e | not run | requires live backend + DB and a real user account |
-
-Required but missing to run the full flow: MongoDB, Redis, Cloudinary account, OCR.space key (code uses the public demo key `"helloworld"`), Google API key, Gmail app password, a seeded admin (`npm run seedAdmin`), medicine import (`npm run migrateMedicine`, downloads ~14,500 RxNav concepts).
-
-### 3.3 Defects that break or bypass main flows (all VERIFIED by reading code)
-
-1. **Error middleware throws on every handled error.** `backend/server/middleware/errorMiddleware.js:31` — `return res.status(err.code).message(err.message)`. `res.message` is not an Express method, so every `next({code: 401|403|404|409, …})` raises a `TypeError` inside the error handler and Express returns a generic HTML 500. Mongo duplicate-key errors (`err.code === 11000`) would hit `res.status(11000)` → `RangeError`. Introduced in commit `4e72e5e0` "made the error middleware better" (2026-10-12).
-2. **Real-time chat cannot connect.** Server: `initializeSocket.js` listens on **5000** (and logs "port 1000"). Client: `SocketInitialize.jsx` dials `http://localhost:1001` with websocket transport. Vite proxy targets `localhost:1000`. No pair matches. Messages are still persisted via REST; live delivery never happens.
-3. **Medicine identification is disconnected.** `ocrTest.js:36` has `//const a = await Redis(structuredData["medicineName"]);` commented out, so the Damerau-Levenshtein / Redis matcher is dead code. The Gemini `generateContent` result is awaited and discarded. OCR.space is called with the public demo key.
-4. **Navigation / A\* does not exist.** `routes/astarRoute/astarRoute.js` is 100 % comments; `controllers/astarController/astarAlgorithm.js` was deleted (commit `e8b54390`) and was itself fully commented out before deletion (contained a hard-coded Windows path). `MapWithPath.jsx` posts to `/api/v1/astar`, which is not mounted. `jsonData/roadGraph.json` (4 nodes) is referenced by nothing. The README's "shortest navigation route" feature is therefore not implemented; `location.jsx` does show nearby pharmacies via Haversine.
-5. **`.env.example` cannot start the application.** `JWT_SECRET=medigo` (6 chars) fails the `min(18)` rule in `env.js`. It also sets `ACCESS_SECRET ≠ JWT_SECRET`, while `signInUser.js` signs the access token with `ACCESS_SECRET` and `authMiddleware.js` verifies with `JWT_SECRET`; a fresh deployment from the example would reject every authenticated request. It works today only because the committed `.env` sets both secrets to the same 38-character value (verified with a jsonwebtoken sign/verify script).
-6. **Case-sensitive import.** `PrescriptionUpload.jsx:19` imports `"./prescriptionImage"`; the file is `PrescriptionImage.jsx`. Builds on macOS; fails on Linux CI/Docker.
-7. **Scheduler correctness.** `FilterDoctors()` uses `forEach(async …)` (unawaited) and `priorityQueue.js` keeps at most 8 appointments per doctor, silently dropping the rest; the comparator keys on `"new"|"urgent"|"regular"` while the model stores `appointmentType ∈ {1,2,3}`, so every appointment gets priority 99 and ordering falls back to age/date only.
-
-### 3.4 Classification
-
-**C. Partially Complete Application.**
-Evidence for completeness: login/registration, role-gated dashboards, admin CRUD for users/doctors/pharmacies, appointment booking with ownership checks, blog CRUD with image upload, reminders with cron mailer, pharmacy radius search with map, prescription upload to Cloudinary — all wired from UI to database.
-Evidence against: the three differentiating features advertised in the README (OCR → medicine information, nearest-pharmacy navigation, real-time doctor chat) are stubbed, mis-wired or absent; the error path is broken for every endpoint; CI fails as committed.
-
-| Verdict | Value |
-|---|---|
-| Executable | **PARTIAL** (frontend builds; backend boots; services, credentials and the fixes above required) |
-| End-to-End | **PARTIAL** |
-| Platform adaptation | Full-stack web; no adaptation applied |
-
----
-
-## SECTION 4 — APPLICATION MATURITY
-
-| Dimension | Evidence | Assessment |
-|---|---|---|
-| Architecture | Layered Express; React SPA with lazy routes | conventional, adequate |
-| Feature completeness | see Section 3.3 | partial |
-| Error handling | consistent `next({code,message})` pattern, but central handler broken; `uploadPrescription.js` tests `err.mesasge` (typo) | defective |
-| Validation | yup for env/user/pharmacy/appointment/password; Mongoose constraints; `validateReqBody` rarely applied | moderate |
-| Testing | 5 unit tests (2 failing), 1 e2e | weak |
-| Security | see Section 13.8; critical reset bypass | weak |
-| Persistence | Mongoose schemas, one compound unique index, no migrations/versioning | basic |
-| Configuration | env validated for 3 of ~28 keys; `.env` committed; hard-coded origins/ports/URLs | weak |
-| Logging | pino with redaction of cookie/token fields; some `console.*` remain | adequate |
-| Monitoring | none (no health endpoint; CI curls `/` which has no route) | absent |
-| Performance | Redis cache of medicine list (1 h TTL); lazy-loaded routes | basic |
-| Scalability | single-process socket presence map; no clustering | n/a |
-| Refactoring | Oct-2026 hardening (logger, rate limits, env schema, route protection) | some |
-| Documentation | root README with setup; inaccurate in places; frontend README is Vite template | minimal |
-| Git evolution | 17 months, 3 contributors, bursts | moderate |
-| Dependency management | backend lockfile; frontend none; `nodemon ^1.14` (2018) | mixed |
-| Edge cases / recovery | scheduler drops >8 appointments; OTP never consumed; no retries on external calls | weak |
-| Maintainability | typos baked into identifiers and URLs; duplicated components | weak |
-
-**Classification: Early-stage. Application Maturity Score: 4/10.**
-
----
-
-## SECTION 5 — PROPRIETARY / ORIGINAL CODE ASSESSMENT
-
-| Material | Finding |
-|---|---|
-| First-party source | 11,726 logic LOC, all application-specific; no copied libraries detected |
-| Third-party libraries | consumed via npm only (Section 6) |
-| Vendored / generated source | none |
-| Templates / boilerplate | `frontend/README.md` is the stock Vite template; `react.svg`, `vite.svg` are template assets (unused) |
-| Copied code | Damerau-Levenshtein and Haversine are textbook formulas (not copyright-significant) |
-| External assets | 17 images; at least two are third-party stock (Section 6) |
-| Fonts / icons | MUI icons, lucide-react, react-icons via npm; one hot-linked iconfinder PNG |
-| Sample data | `roadGraph.json` (hand-written, 4 nodes, unused); admin seed with personal emails |
-
-**Original implementation: HIGH** for code. Image assets are excluded from that judgement. Legal ownership is not asserted; see Section 23 on contributor consent.
-
----
-
-## SECTION 6 — THIRD-PARTY DEPENDENCY & ASSET AUDIT
-
-### 6.1 Runtime dependencies (npm, not vendored)
-
-Licenses were read from each installed package's manifest in the scratch install.
-
-| App | Scope | MIT | Apache-2.0 | BSD-2 | ISC | MIT-0 | Hippocratic-2.1 |
-|---|---|--:|--:|--:|--:|--:|--:|
-| backend | 27 deps + 14 dev | 36 | 2 (`@google/generative-ai`, `mongodb`) | 1 (`dotenv`) | 1 (`node-cron`) | 1 (`nodemailer`) | 0 |
-| frontend | 29 deps + 13 dev | 36 | 2 (`formik`, `@playwright/test`) | 2 (`leaflet`, `leaflet-control-geocoder`) | 1 (`lucide-react`) | 0 | **1 (`react-leaflet@5.0.0`)** |
-
-Notes: `react-leaflet` 5.x is licensed under the Hippocratic License 2.1, an ethical-use license that is not OSI-approved; whether that is acceptable to the vendor requires verification. `@tanstack/react-query` is listed as a backend dependency but unused there. `nodemon ^1.14.10` is a 2018 release. Only the backend has a lockfile.
-
-Significant dependencies and purpose:
-
-| Name | Version | Purpose | License |
-|---|---|---|---|
-| express | ^5.2.1 | HTTP framework | MIT |
-| mongoose / mongodb | ^8.14 / ^6.16 | ODM / driver | MIT / Apache-2.0 |
-| socket.io, socket.io-client | ^4.8.1 | chat transport | MIT |
-| redis | ^5.6.0 | OTP, presence, cache | MIT |
-| jsonwebtoken, bcrypt | ^9.0.2 / ^6.0.0 | auth | MIT |
-| helmet, express-rate-limit, cors | — | HTTP hardening | MIT |
-| cloudinary | ^2.6.1 | image storage | MIT |
-| jimp | ^0.22.12 | image preprocessing | MIT |
-| @google/generative-ai | ^0.24.1 | Gemini call (result unused) | Apache-2.0 |
-| nodemailer | ^10.1.0 | SMTP | MIT-0 |
-| node-cron | ^4.2.1 | schedulers | ISC |
-| yup | ^1.6.1 | validation (both apps) | MIT |
-| react, react-dom, react-router-dom | ^19.1 / ^7.6 | UI | MIT |
-| @mui/* , @emotion/* | ^7.x | UI kit | MIT |
-| leaflet, react-leaflet | ^1.9.4 / ^5.0.0 | maps | BSD-2 / Hippocratic-2.1 |
-| chart.js, react-chartjs-2, @mui/x-charts | — | charts | MIT |
-
-### 6.2 Assets in the tree
-
-| File | Size | Referenced | Observation | Risk |
-|---|--:|:-:|---|---|
-| `frontend/src/assets/bigdocor.png` | 367 kB | yes | Cartoon doctor; **visible "envato" watermark** → unlicensed stock preview | **HIGH** |
-| `frontend/src/assets/a.png` | 545 kB | yes | Photograph of a model in a white coat; stock-style crop badge | **HIGH** |
-| `frontend/src/assets/doctor.png` | 58 kB | yes | Clip-art doctor + nurse | unknown origin |
-| `hand.png`, `scope.png`, `prescription.png`, `stethoscope.jpg`, `appointmenthouse.jpg`, `download.jpg`, `navimage.png`, `try.png`, `calender.avif` | 8–224 kB | mostly yes | clip-art / photos; `download.jpg` and `try.png` names suggest web downloads | unknown origin |
-| `MEDIGO.png`, `logo.svg` | 64 kB / 0.3 kB | yes | project logo | plausibly first-party, NOT VERIFIED |
-| `samrat.png` | 248 kB | yes | cartoon avatar named after an author | plausibly first-party, NOT VERIFIED |
-| `react.svg`, `vite.svg` | — | no / yes | Vite template (MIT) | low |
-| `backend/server/jsonData/roadGraph.json` | 684 B | no | hand-written 4-node graph | low |
-
-Hot-linked at runtime: `https://{s}.tile.openstreetmap.org/...` (ODbL; attribution present in `location.jsx`), `https://cdn0.iconfinder.com/.../678111-map-marker-512.png` (license unknown; used for both user and pharmacy markers), `https://unpkg.com/leaflet@1.9.3/dist/images/...`.
-Git submodules: none. Native deps: `bcrypt` (prebuilt binaries).
-
-**Status: Third-party dependencies identified; ownership/license status of images requires verification.**
-**Third-Party Dependency Risk: HIGH** (assets) · LOW (npm runtime packages, subject to the Hippocratic-license decision).
-
----
-
-## SECTION 7 — PII & SENSITIVE INFORMATION AUDIT
-
-Scope: current tree (manual read of every config/seed/test file + gitleaks) and full Git history (`gitleaks git .`, 173 commits scanned, 146.9 MB, 255 findings in 20 commits). Values below are masked.
-
-### 7.1 Current tree — FOUND
-
-| Location | Content | Type |
-|---|---|---|
-| `backend/.env` (tracked, 6 commits since 2025-05-09) | `MONGO_DB_URL`, `JWT_SECRET` (38 chars), `ACCESS_SECRET` (same value), `cloudinaryAPIKey` (15 digits), `cloudinaryAPISecret` (27 chars), `cloudinaryAPIEnvironmentEVariable` (full `cloudinary://key:secret@cloud` URL), `EMAIL_USER` (`medi…@gmail.com`), `EMAIL_PASSWORD` (16-char Gmail app password), `GOOGLE_API_KEY` (`AIza…`, 39 chars) | secrets |
-| `backend/.env.example` | identical Cloudinary key/secret, Gmail app password and Google API key as `.env`; weaker JWT secret | secrets |
-| `backend/server/db/seeding/adminSeeding.js` | three personal `@gmail.com` addresses, first/last names, bcrypt hashes, a shared coordinate | PII |
-| `frontend/test/login.spec.js` | a developer's personal email and plaintext password `Test@…` | PII + credential |
-| `backend/server/controllers/scanPrescriptionController/ocrTest.js` | OCR.space key literal `"helloworld"` (public demo key, not a secret) | note |
-
-The `.env` header states the values are "cred for testing that may or may not be valid". Validity was NOT tested (no outbound calls were made). Treat as live until rotated.
-
-### 7.2 Git history — FOUND
-
-| Finding | Where | Commit(s) |
-|---|---|---|
-| Hard-coded Google API key in source | `backend/server/controllers/scanPrescriptionController/ocrTest.js` and ~45 `.history/…/ocrTest_2025082807*.js` snapshots | `1588f1c5` and earlier |
-| Credential literal in Redis client config | `backend/server/helper/redisHelper.js`, `.history/…/redisHelper_20250627103207.js` | `a2514ade` (2025-08-29) |
-| `.env` snapshots | `.history/backend/.env_2026100…` ×14 | Oct 2025–Oct 2026 |
-| `backend/.env` committed | 6 commits (`693e9f1d`, `72852470`, `a9635b35`, `48708c3c`, `074ab3a0`, `f32b2fe1`) | 2025-05-09 → 2026-10-13 |
-| `MediGo project proposal.pdf` | added `3f281dfe` (2025-05-08), deleted `95e09d5d` (2025-10-05); still retrievable | — |
-| `node_modules/` | 4,530 paths added then removed | May 2025 |
-| `.history/` (VS Code Local History) | 40,923 paths added then removed in several passes | Jun 2025–Oct 2026 |
-
-### 7.3 Summary
-
-| Check | Result |
-|---|---|
-| Current Sensitive Information Findings | **FOUND** |
-| Historical Sensitive Information | **FOUND** (gitleaks executed over full history) |
-| Potential PII | **FOUND** (developer emails, names, a plaintext password) |
-| Potential Security Secrets | **FOUND** (Cloudinary secret, Gmail app password, Google API key, JWT secrets) |
-| Medical / customer / financial data | NONE found (no patient data in repo) |
-| Internal infrastructure | localhost only; no internal hostnames |
-
-Gate G1 is open. Remediation requires credential rotation **and** history rewrite (git filter-repo) followed by a clean gitleaks run.
-
----
-
-## SECTION 8 — GIT HISTORY, CHANGES & COMMITS
-
-| Metric | Value |
-|---|---|
-| First commit | `98ba06a2` 2025-05-08 "Add frontend directory as a normal folder" |
-| Latest commit | `f32b2fe1` 2026-10-13 "new frontend fixes" |
-| Total commits on `main` | 247 (248 across all refs) |
-| Unique (author-date, subject) pairs | **137** — the log is nearly fully duplicated; two parallel chains with identical messages and dates indicate a history rewrite/re-merge |
-| Non-merge commits / unique | 193 / 108 |
-| Merge commits | 54 (30 are GitHub "Merge pull request" commits, 12 are branch syncs, rest conflict fixes) |
-| Active (distinct) commit days | 45 |
-| Development period | 17 months, but effectively May–July 2025 (194 commits) + Aug–Sep 2025 (12) + Oct 2025 & Oct 2026 hardening (41) |
-| Authors | 3 people under 7 identities: Samrat Poudel 203 non-merge commits (4 identities incl. `@swifttech.com` / `.com.np`), Utsav Luitel 44 (2 identities), Jenish Oli 4 |
-| Branches | `main`, `origin/project/samrat` (1 ahead, 212 behind), `origin/project/utsav`, `origin/project/jenish` (stale) |
-| Tags | none |
-| Commit hours (author local) | peak 19:00–22:00 (113 commits), secondary 11:00–15:00 |
-
-Commit-size distribution: largest commits are hygiene events — removing committed `node_modules` (−937,572 lines, `26c5d4d0`), adding/removing the Vite template `node_modules` (±317,510), `.history` additions of 100k+ lines. Feature commits are typically 5–40 files.
-
-Commit-message analysis:
-
-| Pattern | Examples | Count |
-|---|---|---|
-| Generic / repeated | "added files" ×8, "added all files" ×4, "husky" ×4, "fixed all", "push", "message", "fixing code" | ~40 % of unique messages |
-| Feature-oriented | "added chat message in system", "added pharmacy and maps in system", "OCR completed", "added priority queue", "added forgot password route" | ~35 % |
-| Bug-fix / security | "fixed editPatientDetails abd Pharmacy delete/approve unauthenticated", "fixes for routes protection, saltrounf and socker auth similarly user password leakage" | ~10 % |
-| Infra / tooling | "configured docker and github actions", "frontend ci/cd and eslint config", "configured logger in systen", "rate limiter and token sepration done" | ~10 % |
-| Hygiene | "Remove node_modules and update .gitignore", "Delete .history directory" ×3, "Delete backend/.env", "Add .env to gitignore" | ~5 % |
-
-Refactoring commits: few (logger introduction, rate-limiter extraction, env schema). Dependency updates: "Add redis dependency". Architectural changes: socket server added July 2025; config/env schema Oct 2026.
-
-Assessment: the history demonstrates real, incremental, multi-person development with a plausible chronology (models → routes → controllers → admin UI → doctor UI → OCR → chat → hardening). It is degraded by committed `node_modules`, `.history` and `.env`, a duplicated commit chain, generic messages and misspellings.
-
-**Git History Quality: 4/10.**
-
----
-
-## SECTION 9 — PULL REQUEST ANALYSIS
-
-Evidence available only from merge commits (the GitHub API was not queried; `gh` is not installed).
-
-| PR | Date | Branch | Merged by |
-|---|---|---|---|
-| #1–#3, #5–#7 | 2025-05-15 → 05-21 | project/samrat | Samrat Poudel (own branch) |
-| #4, #8–#10, #12, #14–#16 | 2025-05-16 → 06-22 | project/utsav | #4 by Samrat; others by Utsav (own branch) |
-| #13 | 2025-06-17 | project/jenish | Jenish (own branch) |
-| #11 | — | absent from history (closed or unmerged) | — |
-
-Fifteen PRs merged in 5½ weeks, then the workflow stopped; all later work (July 2025 onward, 100+ commits) was pushed directly to `main`. PR titles beyond branch names, descriptions, review comments, requested changes and iteration counts are **NOT AVAILABLE**. Most PRs appear self-merged.
-
-**PR / Code Review Maturity: 4/10** (a PR workflow existed briefly; review content unverified).
-
----
-
-## SECTION 10 — TESTING & COVERAGE
-
-| Item | Finding |
-|---|---|
-| Unit tests | `backend/server/test/signUp.test.js` — 5 Jest cases for `signUpUser` with mocked Mongoose models, bcrypt and the yup schema; covers success (patient, doctor), 409 duplicate, 400 validation, 500 generic |
-| Integration / API tests | none |
-| End-to-end | `frontend/test/login.spec.js` — 1 Playwright case (login → expect `/dashboard` and "Welcome"); uses a developer's real email/password; `playwright.config.js` starts both dev servers |
-| UI / functional / performance / security tests | none |
-| Fixtures, mocks, test data | inline `jest.mock` only |
-| Failure-path tests | 3 of 5 unit cases |
-| Test LOC / ratio | 114 / 0.97 % |
-| Result as committed | Jest: **3 pass, 2 fail** (message typo; doctor-path mock expectation). Playwright: not run |
-| Coverage report | `npm run test:coverage` script exists; no report in repo. **Measured test coverage was not available.** |
-| CI | both workflows run lint (+ Jest for backend) — currently failing; Dockerfile `test` stage would also fail at `npm run lint` |
-
-Also: tests cannot run without the committed `.env` (env validation exits the process), and the Playwright login spec asserts a `/dashboard` URL that no route in `App.jsx` matches for Patients (`/Home`) — only `/doctor/dashboard` would.
-
-**Testing Maturity Score: 2.5/10.**
-
----
-
-## SECTION 11 — CODE QUALITY & READABILITY
-
-### Positives (with examples)
-- One use case per file, short functions (most controllers 15–40 lines).
-- Uniform error convention `return next({ code, message })` across ~45 controllers.
-- `env.js`: schema-validated, frozen config object; `loggerHelper.js`: pino with `redact` for cookies/tokens.
-- `showAllPharmacy.js`: small pure helpers (`getAllPharmacies`, `formatPharmacyResponse`) separated from the handler.
-- `location.jsx`: `useCallback`/`useMemo`, marker cleanup, geolocation permission handling, debounced radius.
-- `App.jsx`: route-level code splitting with `lazy`, nested role guards.
-
-### Negatives (with examples)
-- **Typos baked into identifiers and URLs:** `recieverId` (schema + API), `Remainder`/`reaminderRoute.js`, `gerAllUnapprovedAppointment.js`, `getAllToadysAppointment.js`, `verfiyOTP.js`, `extraxtText` (schema field, so OCR text is never persisted under the intended name), `err.mesasge`; 9 files with "sucessful".
-- **Odd structure:** directories named `chatController.js/` and `blogController.js/`; routes split between `routes/authRoute/patientRoute.js` and `routes/patientRoute.js`.
-- **Duplication:** 9 near-duplicate pairs by sequence similarity — `CreateDoctor.jsx` ↔ `UserDoctorRegistrationPage.jsx` 0.99, `AdminProfile.jsx` ↔ `Profile.jsx` 0.98, `PopUpModal.jsx` ↔ `UserPopUp.jsx` 0.97, `AdminProfile.jsx` ↔ `viewProfile.jsx` 0.90, `gerAllUnapprovedAppointment.js` ↔ `getAllToadysAppointment.js` 0.84, `getAllAppointments.js` ↔ `getAllPatient.js` 0.83, `DeletePharmacy.jsx` ↔ `removeDoctor.jsx` 0.80, `deleteDoctor.js` ↔ `deletePatient.js` 0.77.
-- **Dead code:** `AuthContext.jsx` (2 lines, unused), `UserData.jsx` (empty), `astarRoute.js` (all comments), `MapWithPath.jsx` (calls missing endpoint), `roadGraph.json`, unused imports (`express`, `AxiosError`, `useQueryClient` partially), stray statements `getAllAppointmentForDoctor;` and `getBlogsOfSpecificUser;` in route files.
-- **Debug residue:** 53 `console.log` in frontend; 4 `console.*` in backend.
-- **Hard-coding:** 10 `localhost` URLs in source; socket ports 5000/1000/1001; CORS allow-list; bcrypt rounds `10` in `changePassword.js` despite `SALT_ROUND` env.
-- **Inconsistent formatting:** tabs (`MapWithPath.jsx`) vs 2-space; trailing-comma styles differ; mixed quote styles.
-- **HTTP semantics:** `201` for read endpoints (`userCount.js`); `401` for "no chat users"; `signOut.js` clears cookie `accessToken` twice though the cookie set at login is `token`.
-- **Three `.gitignore` files**, one UTF-16 encoded with a `.backup` suffix.
-
-| Score | Value |
-|---|--:|
-| Code Quality | **4.5/10** |
-| Readability | **5/10** |
-| Maintainability | **4/10** |
-
----
-
-## SECTION 12 — AI-GENERATED CODE LIKELIHOOD
-
-**Git signals.** Organic chronology with weekly feature increments (May–July 2025), merge conflicts, hygiene mistakes, and a late 41-commit burst (2025-10-05/06, 2026-10-12/13) that added Docker, CI, pino, rate limiters, env validation and security fixes in two days. Timestamps cluster in evenings. The duplicated chain is a tooling artefact, not an authorship signal.
-
-**Source signals.** Later files (`Dockerfile`, `.dockerignore`, `env.js`, `rate_limiter.js`, `showAllPharmacy.js`, `location.jsx`, `ProtectedRoute.jsx`, `index.js` CORS comment "Allow requests without an Origin header, such as server-to-server calls.") are noticeably more polished and commented than the May–July code. Error-handling templates are uniform. Against: pervasive human misspellings, inconsistent naming, commented-out experiments, a Windows absolute path left in a deleted file, mismatched ports and secrets, a failing test left in place.
-
-| Category | Evidence |
-|---|---|
-| Strong | none |
-| Moderate | stylistic discontinuity between the 2025 core and the Oct-2025/2026 hardening files |
-| Weak | uniform try/catch → `next()` scaffolding; descriptive comments in a few files |
-| Against | typos in identifiers, organic bug-fix commits, three identifiable contributors, academic-project artefacts |
-| Inconclusive | duplicated commit chain; no tool-specific markers |
-
-**AI Code Likelihood Score: 5/10 (moderate / inconclusive).** No specific tool is identified. Value-neutral per §17.7.
-
----
-
-## SECTION 13 — DEEP TECHNICAL COMPLEXITY ANALYSIS
-
-### 13.1 Architecture — 4/10
-Layered Express (routes → middleware → controllers → Mongoose models) with helper singletons; React SPA with route-based role guards and TanStack Query. Not Clean/Hexagonal: controllers call models directly; there is no service layer; `doctorRoute.js` imports admin controllers; `patientRoute.js` upload route lacks `isPatient`; a second Express/http instance exists solely to host Socket.IO (`initializeSocket.js`), created as an import side effect. Extensibility is by adding files; coupling is moderate; cohesion per file is good.
-
-### 13.2 Module complexity — 4.5/10
-
-| Module | Purpose | Key files | Difficulty |
-|---|---|---|---|
-| Auth / OTP | sign-up/in, roles, JWT, OTP reset | `userAuthController/*`, `authMiddleware.js`, `rate_limiter.js` | moderate |
-| Admin | user/doctor/pharmacy management, counts | `adminController/*` | low |
-| Doctor | appointments, patients, age aggregation, prescriptions | `doctorController/*` | low–moderate |
-| Appointment + priority | booking, ownership, cron slot assignment | `appointmentController/*`, `appointmentPriority/*` | moderate (and buggy) |
-| Prescription OCR | multer → Jimp → OCR.space → Gemini → regex → Cloudinary | `scanPrescriptionController/*`, `multerHelper.js` | highest in repo |
-| Pharmacy / geo | CRUD, Haversine radius search | `pharmacyController/*`, `geoUtils.js`, `location.jsx` | moderate |
-| Chat | REST persist + Socket.IO emit via Redis presence | `chatController.js/*`, `socketIo/*`, `ChatApp/*` | moderate |
-| Blog, Reminder | CRUD; cron mailer | `blogController.js/*`, `ReminderController/*` | low |
-
-### 13.3 Algorithmic complexity — 3.5/10
-
-| Algorithm | What / where | Difficulty & notes |
-|---|---|---|
-| Damerau-Levenshtein (OSA) | `damerauLevenshtein.js`, 38 lines, O(m·n) matrix | textbook; used by `Redis.js` to pick the nearest of ~14.5k names (O(N·m·n) per lookup, no early exit); **not wired in** |
-| Haversine + radius filter | `geoUtils.js` | standard formula; map → filter → sort |
-| Appointment "priority queue" | `priorityQueue.js` | array push + full re-sort per insert, capped at 8; comparator keys mismatch the numeric enum; slot assignment by index |
-| OCR text extraction | `extractText.js` | regex per line; naive (`/age/i` also matches "manage") |
-| Age-bucket aggregation | `getDoctorPatientByAge.js` | three `$match/$group` pipelines |
-| Image preprocessing | `uploadPrescription.js` | Jimp resize/grayscale/contrast/sharpen kernel/threshold |
-| A\* path-finding | claimed in README and commit messages | **absent** |
-
-No correctness-critical math, protocol parsing or original primitives. Reimplementation difficulty: low.
-
-### 13.4 Business logic — 5/10
-Rules: three roles with distinct dashboards; doctors require admin approval (`isApproved`); pharmacies have approval too; appointment uniqueness (patient, doctor, date, slot) via compound index plus a pre-check; priority by type → age band (≥70, ≤16) → date; completed/approved state flags; reminders match `HH:mm` each minute; OTP reset with 5-minute Redis TTL. Workflows are multi-entity but shallow; several rules are inconsistent (string vs numeric type, slot enum vs free text), and the reset workflow has no binding between OTP verification and password change.
-
-### 13.5 Concurrency / async — 4/10
-`async/await` throughout; two `node-cron` jobs; Socket.IO with Redis `userId → socketId` presence (set on connect, deleted on disconnect); unawaited `forEach(async)` in `FilterDoctors`; `createReminder` does not await `RemainderTable.create`; no transactions, locks, queues or idempotency.
-
-### 13.6 Database / data — 4/10
-Nine schemas (User, Doctor, Pharmacy, Appointment, Prescription, Chat, Blog, Reminder, Medicine). Relationships via `ObjectId` refs with `populate` in a few places. One explicit compound unique index; `unique` on email/licenseNo/userId. Validation: `select:false` on password, enums, maxlength (note latitude/longitude ranges swapped in `userModels.js`). No migrations; `medicineMigration.js` is a one-off RxNav import (`insertMany ordered:false`). Redis caches the full medicine list as one JSON string (1 h TTL).
-
-### 13.7 Networking / integrations — 5/10
-Cloudinary SDK upload; OCR.space multipart POST (axios, demo key, no timeout); Gemini `generateContent` (result discarded); Nodemailer Gmail service; RxNav GET; Socket.IO server+client; Leaflet/OSM tiles; browser Geolocation API. No retries, timeouts, circuit breaking or idempotency; errors bubble to the (broken) error handler.
-
-### 13.8 Security — 4/10
-Implemented: JWT bearer auth (`authMiddleware.js`), role guards, bcrypt (env salt rounds), helmet, global + four route-specific rate limiters, yup validation, Mongo ObjectId validation middleware, appointment ownership check, OTP in Redis with TTL, pino redaction, httpOnly cookies also set (unused by client).
-Defects (VERIFIED in code):
-1. **Account takeover:** `PATCH /api/v1/resetPassword` (`authRoute.js:23`) has no auth middleware; `changePassword.js` with no `req.user` takes `req.body.email` and sets the new password without verifying any OTP. `verifyOTP` is a separate, stateless 200/400 check and never deletes the OTP.
-2. `PUT /approvePharmacy/:id` lacks `isAdmin` (`pharmacyRoute.js:13`).
-3. Access token stored in `localStorage` (XSS-exposed); refresh token cookie set without `secure`.
-4. Secrets committed (Section 7); `JWT_SECRET` and `ACCESS_SECRET` identical.
-5. `express.static("uploads")` serves the raw upload directory.
-6. Error handler leaks `err.stack` whenever `NODE_ENV !== "production"` — and `NODE_ENV` is not in the validated schema.
-
-### 13.9 Scalability / performance — 3/10
-Single-process assumptions (socket presence per instance, in-memory rate-limit store); full-collection scans (`PharmacyTable.find()` then in-memory filter; medicine matching linear over 14.5k names); 972 kB main bundle; no pagination on list endpoints.
-
-### 13.10 Infrastructure / build — 4.5/10
-Multi-stage Dockerfile (test stage runs lint + Jest, production stage `npm ci --omit=dev`); backend CI: lint → test → start → curl → docker build/run/curl; frontend CI: lint → build; husky + lint-staged. Weaknesses: CI fails as committed (lint error, 2 failing tests, missing frontend lockfile for `npm ci`, `curl http://localhost:3000` hits no route); no environment matrix, no deploy, no compose for Mongo/Redis.
-
-### 13.11 Testing complexity — 5/10
-Seven external boundaries (Mongo, Redis, Cloudinary, OCR.space, Gemini, SMTP, Socket.IO) plus cron timing and file-system uploads make meaningful integration testing non-trivial; nothing in the repo addresses this (no test containers, no mocks beyond one unit file).
-
----
-
-## SECTION 14 — TECHNICAL COMPLEXITY SCORE
-
-| Category | Score | Weight | Weighted |
-|---|--:|--:|--:|
-| Architecture | 4.0 | 15 % | 0.600 |
-| Algorithms | 3.5 | 15 % | 0.525 |
-| Business Logic | 5.0 | 15 % | 0.750 |
-| Modules | 4.5 | 10 % | 0.450 |
-| Concurrency / Async | 4.0 | 10 % | 0.400 |
-| Database / Data | 4.0 | 10 % | 0.400 |
-| Networking / Integrations | 5.0 | 10 % | 0.500 |
-| Security | 4.0 | 5 % | 0.200 |
-| Scalability / Performance | 3.0 | 5 % | 0.150 |
-| Infrastructure / Build | 4.5 | 3 % | 0.135 |
-| Testing Complexity | 5.0 | 2 % | 0.100 |
-| **Technical Complexity Score (C)** | | **100 %** | **4.21 / 10 — Low** |
-
-No category reaches 9–10; none shows an original algorithm, correctness-critical computation, binary protocol or distributed coordination. LOC and file counts did not influence any score.
-
----
-
-## SECTION 15 — DEVELOPMENT EFFORT (sanity check only)
-
-Considerations: modest architecture, no requirements discovery artefacts beyond README, textbook algorithms, moderate multi-role business logic, seven integrations to wire, simple schema, security to be done properly, testing largely absent, infra partially done.
-
-| Profile | Person-months |
-|---|--:|
-| Junior developer | 10–12 |
-| Mid-level developer | 6–8 |
-| Senior developer | 4–5 |
-| Senior/architect-led team | 4 |
-
-Estimated realistic team: 2–3 developers · calendar duration: 3–4 months · total engineering effort: ≈ 7 person-months.
-Band cross-check: C < 5 → 1,500–2,500 LOC per person-month → 11,733 / 2,500 … 11,733 / 1,500 = **4.7–7.8 person-months**. Consistent with three part-time authors across May–July 2025 plus a hardening burst. Effort is **not** a price input.
-
----
-
-## SECTION 16 — VENDOR QUALIFICATION SCORE
-
-| Component | Score | Source |
-|---|--:|---|
-| Repository Size Eligibility | 10 (PASS) | §2 |
-| End-to-End Completeness | 5.5 | §3 (class C) |
-| Executability | 5.0 | §3.2 |
-| Application Maturity | 4.0 | §4 |
-| Originality | 7.5 (HIGH) | §5 |
-| Code Quality | 4.5 | §11 |
-| Git History | 5.0 | §8 (M sub-score) |
-| Testing | 3.0 | §10 (M sub-score) |
-| **Mean** | **44.5 / 8 = 5.6** | |
-
-Not counted as passes: PR review content (unknown), runtime success against live services (not verified), code completeness of advertised features (partial), reusability (low; app-specific). **Vendor Qualification Score: 5.6/10.** Informational only; not a price input.
-
----
-
-## SECTION 17 — COMMERCIAL VALUATION
-
-> Proposed internal estimation model from the pasted methodology; not a confirmed vendor formula.
-
-### 17.1 Effective LOC
-L = 11,726 − 0 − 0 − 0 + 0.5 × 14 = **11,733** (Section 2).
-
-### 17.2 Technical Complexity
-C = **4.21** (Section 14).
-
-### 17.3 LOC Size Factor
-LOCf = min(1, 1.2 × 11,733 / (11,733 + 100,000)) = min(1, 14,079.6 / 111,733) = **0.1260**.
-
-### 17.4 Maturity & Commercial Readiness (M)
-
-| Sub-score | Weight | Score | Weighted | Evidence |
-|---|--:|--:|--:|---|
-| End-to-end completeness | 20 % | 5.5 | 1.100 | Classification C: core CRUD wired; OCR→medicine, navigation, live chat stubbed/broken |
-| Executability | 15 % | 5.0 | 0.750 | Frontend builds; backend boots with committed `.env`; lint/tests fail; no frontend lockfile; hard-coded ports; `.env.example` invalid; requires 6 external services |
-| Application maturity | 15 % | 3.5 | 0.525 | Error handler broken for all handled errors; no migrations/monitoring; unawaited async; config partially validated |
-| Testing | 15 % | 3.0 | 0.450 | 3 passing real unit tests + 2 failing; ratio 0.97 % (< 2 %) |
-| Code quality | 15 % | 4.5 | 0.675 | mean of 4.5 / 5 / 4 |
-| Git history | 10 % | 5.0 | 0.500 | 247 commits (137 unique), 45 active days, 3 authors → "≥100 commits or ≥40 active days" band; hygiene issues keep it at the band floor |
-| PR / review | 5 % | 5.0 | 0.250 | 15 PRs merged, review content not visible |
-| Documentation | 5 % | 3.5 | 0.175 | README with setup steps (duplicated numbering, inaccurate Jest claim); no API or architecture docs; frontend README is template |
-| **M** | 100 % | | **4.43** | **Early-stage** (0.07 below the Intermediate threshold) |
-
-### 17.5 Engineering score & multiplier
-E = 4.21 × 0.70 + 4.43 × 0.30 = 2.947 + 1.329 = **4.28**
-EngMult = 1 − (1 − 0.428)² = 1 − 0.3272 = **0.6728** (≈ 0.6724 with unrounded inputs)
-
-### 17.6 Base value
-Base = $50,000 × 0.1260 × 0.6724 = **$4,236**
-
-### 17.7 Evidence flags
-
-| Flag | Value | Evidence |
-|---|---|---|
-| NoRealTests | **0** (×1.0000) | `signUp.test.js` contains five mock-based tests with meaningful assertions, three of which pass; small but real, not IDE stubs |
-| LegacyStack | **0** (×1.0000) | React 19 / Express 5 / Node 24 / ESM; function components with hooks; none of the four criteria hold |
-| A | **1.0000** | |
-| Out-of-calibration overlay | none (1.0) | the repository builds; no verified copyleft contamination |
-
-### 17.8 Gates and final value
-
-| Gate | Status | Evidence |
-|---|---|---|
-| G1 Secrets / PII | **OPEN** | Section 7 (tree and history) |
-| G2 Licence / ownership | **OPEN** | Envato-watermarked `bigdocor.png`, unknown-origin images, Hippocratic-licensed `react-leaflet` to review |
-| G3 Critical safety defect | **OPEN** | unauthenticated password reset (account takeover); error handler converting all handled errors to 500 |
-| G4 Bundle | closed | single product |
-
-**V = min($50,000, max($0, $4,236 × 1.0000)) ≈ $4,200** (uncapped $4,236; cap not reached). Conditional on all open gates being remediated.
-Reachability note: at L = 11,733 the ceiling at E = 10 is $50,000 × 0.1260 = **$6,300**; engineering improvements alone cannot move the estimate past that.
-
-### 17.9 Multi-repository
-Single repository; no related repositories were assessed.
-
----
-
-## SECTION 18 — SCORE SUMMARY
-
-| Metric | Value |
-|---|--:|
-| Effective LOC (L) | 11,733 — PASS |
-| Application Maturity | 4/10 (Early-stage) |
-| Git History Quality | 4/10 |
-| PR / Code Review Maturity | 4/10 |
-| Testing Maturity | 2.5/10 |
-| Code Quality / Readability / Maintainability | 4.5 / 5 / 4 |
-| AI Code Likelihood | 5/10 (inconclusive) |
-| Technical Complexity (C) | 4.21 (Low) |
-| Maturity & Readiness (M) | 4.43 |
-| Engineering Score (E) / EngMult | 4.28 / 0.6724 |
-| LOCf | 0.1260 |
-| Vendor Qualification Score | 5.6/10 |
-| Estimated Commercial Value (V) | ≈ $4,200 (conditional) |
-| Gates open | G1, G2, G3 |
-
----
-
-## SECTION 19 — RISK REGISTER
-
-| # | Risk | Severity | Section |
-|---|---|---|---|
-| 1 | Live-looking third-party credentials in tree and history | Critical | 7 |
-| 2 | Unauthenticated password reset by email | Critical | 13.8 |
-| 3 | Error middleware breaks every handled error response | High | 3.3 |
-| 4 | Unlicensed stock images (Envato watermark) | High | 6 |
-| 5 | Personal emails / plaintext password in seed and test | High | 7 |
-| 6 | Advertised features (OCR→medicine, A\*, live chat) not delivered | High | 3 |
-| 7 | CI/Docker test stage fails as committed; no frontend lockfile | Medium | 3.2, 13.10 |
-| 8 | Hippocratic-licensed dependency | Medium | 6 |
-| 9 | Contributor / institutional consent to submit unverified | Medium | 23 |
-| 10 | Duplicated history and committed `node_modules`/`.history` inflate the log | Low | 8 |
-
----
-
-## SECTION 20 — EVALUATION PROCEDURE LOG
-
-1. `git ls-files`, `git log` (authors, dates, merges, branches, tags), `git shortlog`, per-commit size stats, duplicate-chain detection by tree hash and (date, subject) pairs.
-2. `cloc --vcs=git`; classification script implementing §17.1 rules; per-file LOC; embedded-data and D1 duplicate checks; difflib near-duplicate scan.
-3. Full read of all 106 backend files and ~20 key frontend files (routing, auth, API client, sockets, maps, chat, upload), configs, CI, Dockerfile, READMEs.
-4. `gitleaks git .` over full history with redaction; manual review of `.env`, `.env.example`, seed and test files; history search for ever-tracked sensitive paths.
-5. Scratch-copy execution: `npm ci/install`, ESLint, Jest (with and without `.env`), `node --check`, server boot, `vite build`; jsonwebtoken sign/verify check of secret separation; dependency license extraction from installed manifests.
-6. Visual inspection of four bundled images.
-7. Scoring per §13–17 anchors; no parameter was tuned.
-
----
-
-## SECTION 21 — REMEDIATION PLAN (pre-submission)
-
-1. **Secrets (G1):** rotate Cloudinary, Gmail app password, Google API key, JWT/access secrets; delete `backend/.env` from the tree; scrub literals from `.env.example`; rewrite history with `git filter-repo` to drop `backend/.env`, `.history/`, `node_modules/`, `MediGo project proposal.pdf`; force-push; re-run gitleaks until clean.
-2. **PII:** replace personal emails/passwords in `adminSeeding.js` and `login.spec.js` with environment-driven fixtures.
-3. **Assets (G2):** remove `bigdocor.png`; replace `a.png` and other unknown-origin images with owned or licensed files; replace the iconfinder hot-link; decide on `react-leaflet` (Hippocratic) or pin to a BSD-licensed alternative.
-4. **Critical defects (G3):** require OTP verification (consume the Redis key) and authentication on `/resetPassword`; fix `errorMiddleware.js` (`res.status(code).json(...)`, validate numeric range); add `isAdmin` to `approvePharmacy`.
-5. **Executability:** align Socket.IO port across server/client/proxy and read it from env; fix `prescriptionImage` import case; make `.env.example` pass `env.js`; fix the ESLint error and the two failing tests; commit a frontend lockfile; add a `/health` route for CI.
-6. **Completeness (optional, raises M):** wire the medicine matcher, remove or implement navigation, remove dead files.
-7. **Consent:** written authorisation from all three contributors (and any academic institution associated with the original project proposal) that the submitter may sell the repository.
-
----
-
-## SECTION 22 — UNKNOWNS / NOT VERIFIED
-
-- Vendor LOC counting method and any vendor-specific scoring rules.
-- Runtime behaviour against live MongoDB, Redis, Cloudinary, OCR.space, Gemini and Gmail.
-- Whether the committed credentials are currently valid.
-- PR descriptions, review comments, and iteration counts.
-- Ownership/licence of 15 of 17 images.
-- Authorship/ownership chain: commit authors are Samrat Poudel, Utsav Luitel and Jenish Oli; the assessing workstation account is not among them.
-
----
-
-## SECTION 23 — RECOMMENDATION
-
-**Do not submit in the current state.** Three gates are open (secrets/PII in tree and history, unlicensed assets, a critical authentication defect), and the repository's advertised differentiators are not implemented.
-
-After remediation, MediGo would qualify as a **small, low-complexity (C = 4.21), partially complete (class C) full-stack web application** with an estimated value of **≈ $4,000–$4,500** under the proposed model. Size is the binding constraint: the LOC factor of 0.126 caps the achievable value at about $6,300 even with perfect engineering scores. Growing effective LOC through real feature completion (not padding) and raising M by fixing executability and tests are the only levers that materially change the estimate.
-
-*This is an analytical estimate, not an appraisal, guarantee or statement of vendor policy.*
+ 
+Previewing Repository_Assessment_Combined_Valuation_All_23_Topics_v2 (2) 2.md
+ 
+# Repository Assessment, Technical Complexity, LOC Sizing & Commercial Valuation
+
+
+Derived from *Repository Valuation Methodology: Google-Calibrated, 23-Topic Framework*. The effective-LOC rules (§7), complexity and maturity rubrics (§8), valuation formula (§10), evidence flags, gates and offer band (§13), reachability limits (§14), evaluation procedure (§20) and the 23 topics (§9) below are taken from that document and must be applied as written.
+
+
+Perform a complete, evidence-based assessment of this repository for potential submission to a vendor that purchases proprietary, executable, end-to-end coding repositories.
+
+
+The assessment must be based on the ACTUAL repository.
+
+
+Inspect:
+
+
+- Complete source code
+- Project structure
+- Modules
+- Dependencies
+- Build configuration
+- Runtime configuration
+- Tests
+- Documentation
+- Git history
+- Commits
+- Changes
+- Branches
+- Pull requests, when available
+- Code quality
+- Architecture
+- Algorithms
+- Business logic
+- Executability
+- End-to-end completeness
+- Third-party dependencies/assets
+- Sensitive information exposure
+
+
+Do not make assumptions when repository evidence is unavailable.
+
+
+If something cannot be verified, explicitly report:
+
+
+UNKNOWN / NOT AVAILABLE / NOT VERIFIED
+
+
+Do not invent evidence, coverage percentages, PRs, development history, or runtime behavior.
+
+
+============================================================
+VENDOR REQUIREMENTS
+============================================================
+
+
+The repository is being evaluated against the following vendor requirements:
+
+
+1. Repository-level pricing.
+2. Maximum repository offer: $50,000 USD.
+3. The vendor is specifically interested in large, mature, and complex executable applications.
+4. The vendor wants proprietary executable coding repositories.
+5. The vendor wants end-to-end projects.
+6. The vendor wants well-written and readable code.
+7. The vendor evaluates code complexity and completeness.
+8. Repositories should include history, changes, and commits.
+9. Pull requests should be included when available.
+10. Test coverage should be included when available.
+11. The repository must not contain third-party dependencies or images that the submitter does not own, according to the vendor's submission requirement.
+12. Submitted assets must be vetted for PII and sensitive information before submission.
+
+
+IMPORTANT:
+
+
+The vendor's definition of END-TO-END is:
+
+
+"Complete and executable codebases rather than loose scripts or incomplete code snippets."
+
+
+Therefore, do NOT classify a repository as end-to-end merely because it contains many files or modules.
+ 
+ 
+Repository Assessment, Technical Complexity, LOC Sizing & Commercial Valuation
+Derived from Repository Valuation Methodology: Google-Calibrated, 23-Topic Framework. The effective-LOC rules (§7), complexity and maturity rubrics (§8), valuation formula (§10), evidence flags, gates and offer band (§13), reachability limits (§14), evaluation procedure (§20) and the 23 topics (§9) below are taken from that document and must be applied as written.
+
+Perform a complete, evidence-based assessment of this repository for potential submission to a vendor that purchases proprietary, executable, end-to-end coding repositories.
+
+The assessment must be based on the ACTUAL repository.
+
+Inspect:
+
+Complete source code
+Project structure
+Modules
+Dependencies
+Build configuration
+Runtime configuration
+Tests
+Documentation
+Git history
+Commits
+Changes
+Branches
+Pull requests, when available
+Code quality
+Architecture
+Algorithms
+Business logic
+Executability
+End-to-end completeness
+Third-party dependencies/assets
+Sensitive information exposure
+Do not make assumptions when repository evidence is unavailable.
+
+If something cannot be verified, explicitly report:
+
+UNKNOWN / NOT AVAILABLE / NOT VERIFIED
+
+Do not invent evidence, coverage percentages, PRs, development history, or runtime behavior.
+
+============================================================ VENDOR REQUIREMENTS ============================================================
+
+The repository is being evaluated against the following vendor requirements:
+
+Repository-level pricing.
+Maximum repository offer: $50,000 USD.
+The vendor is specifically interested in large, mature, and complex executable applications.
+The vendor wants proprietary executable coding repositories.
+The vendor wants end-to-end projects.
+The vendor wants well-written and readable code.
+The vendor evaluates code complexity and completeness.
+Repositories should include history, changes, and commits.
+Pull requests should be included when available.
+Test coverage should be included when available.
+The repository must not contain third-party dependencies or images that the submitter does not own, according to the vendor's submission requirement.
+Submitted assets must be vetted for PII and sensitive information before submission.
+IMPORTANT:
+
+The vendor's definition of END-TO-END is:
+
+"Complete and executable codebases rather than loose scripts or incomplete code snippets."
+
+Therefore, do NOT classify a repository as end-to-end merely because it contains many files or modules.
+
+A repository must demonstrate a complete executable application/system flow.
+
+============================================================ SECTION 1 — BASIC REPOSITORY PROFILE ============================================================
+
+First inspect and report the factual characteristics of the repository.
+
+Report:
+
+Repository name
+Primary language(s)
+Framework(s)
+Platform(s)
+Application type
+Number of source files
+Number of test files
+Source LOC
+Test LOC
+Total relevant LOC
+Number of modules
+Number of packages
+Number of major components
+Build system
+Configuration files
+Database
+APIs
+UI
+Background processing
+External integrations
+Executable entry points
+Do not use LOC as a measure of technical complexity. Use LOC to determine vendor size eligibility and as a separate, secondary input to the commercial valuation model in Section 17.
+
+============================================================ SECTION 2 — REPOSITORY SIZE ELIGIBILITY ============================================================
+
+Determine whether the repository meets the vendor's stated repository size requirements.
+
+Vendor size range:
+
+Minimum: 1,000 lines of code
+
+Maximum: 500,000 lines of code
+
+Calculate the relevant code size carefully, using the effective-LOC rules in Section 17.1: git-tracked files only; tests, generated code, vendored code, embedded data and duplicated copies excluded; authored UI markup at half weight. Eligibility is assessed on effective LOC (L).
+
+Separate:
+
+Production/source code
+Test code
+Generated code
+Vendored code
+Third-party code
+Configuration
+Documentation
+Assets
+Do not artificially inflate the repository size.
+
+Report:
+
+Production LOC: X
+
+Test LOC: X
+
+Third-party/vendor LOC: X
+
+Generated LOC: X
+
+Total relevant repository LOC: X
+
+Effective LOC (L, Section 17.1): X
+
+Vendor Size Eligibility (1,000 ≤ L ≤ 500,000):
+
+PASS or FAIL
+
+If the repository is above the maximum or below the minimum, explicitly state that.
+
+============================================================ SECTION 3 — END-TO-END APPLICATION ASSESSMENT ============================================================
+
+This is one of the MOST IMPORTANT sections.
+
+The vendor defines end-to-end as:
+
+"Complete and executable codebases rather than loose scripts or incomplete code snippets."
+
+Determine whether this repository satisfies that definition.
+
+Analyze the complete application flow.
+
+Identify:
+
+Entry point
+Input
+Validation
+Application/business logic
+Data processing
+Persistence
+External communication
+Output
+Error handling
+Configuration
+Testing
+Build/run process
+Describe the actual execution flow.
+
+For example:
+
+INPUT ↓ APPLICATION ENTRY ↓ VALIDATION ↓ BUSINESS LOGIC ↓ DATA PROCESSING ↓ DATABASE / STORAGE ↓ EXTERNAL SERVICES ↓ RESPONSE / OUTPUT ↓ USER / SYSTEM
+
+Use the actual architecture of this repository instead of this generic example.
+
+
+END-TO-END CLASSIFICATION
+
+
+Classify the repository as exactly one of:
+
+A. Complete End-to-End Application B. Mostly Complete Application C. Partially Complete Application D. Library / Framework E. Collection of Scripts F. Prototype / Proof of Concept G. Incomplete Codebase
+
+Explain the classification using concrete evidence.
+
+
+EXECUTABILITY
+
+
+Determine:
+
+Can the repository be built?
+
+Can the repository be executed?
+
+Can the main application flow be demonstrated?
+
+Are required runtime components present?
+
+Are required configurations present?
+
+Are required dependencies available?
+
+Are there missing services?
+
+Are there missing credentials?
+
+Are there missing assets?
+
+Are there unimplemented components?
+
+Identify the actual build and execution commands if available.
+
+Do not claim successful execution unless it has actually been verified.
+
+Provide:
+
+Executable: YES / PARTIAL / NO
+
+End-to-End: YES / PARTIAL / NO
+
+If no build or run was attempted, mark the answer "YES*" meaning plumbing present, not verified, and say so explicitly.
+
+
+PLATFORM ADAPTATION
+
+
+Judge end-to-end completeness and executability against the project type, not against a generic full-stack expectation:
+
+Project type
+Adaptation
+Offline-first mobile app
+The absence of a backend is not a defect. End-to-end is judged against the stated design
+Client-only web or mobile app
+End-to-end is scored for client completeness; dependence on an external backend reduces executability, not complexity
+Backend or microservices
+The absence of a UI is not a defect. Apply duplicate rule D2 (Section 17.1) to copied service cores; container coverage feeds executability
+Cross-platform (Flutter, React Native)
+Exclude platform runner folders; count shared code once
+Desktop application
+Outside the calibration set: assess as-is and set valuation confidence to Low
+Multi-module or multi-repository
+Apply the duplicate rules within the repository and Section 17.9 across repositories
+============================================================ SECTION 4 — APPLICATION MATURITY ============================================================
+
+Determine whether the repository qualifies as a mature application.
+
+Analyze:
+
+Architecture
+Feature completeness
+Error handling
+Validation
+Testing
+Security
+Persistence
+Configuration
+Logging
+Monitoring
+Performance
+Scalability
+Refactoring
+Documentation
+Git evolution
+Dependency management
+Edge-case handling
+Recovery mechanisms
+Maintainability
+Classify:
+
+Prototype
+Early-stage
+Intermediate
+Mature
+Highly Mature / Enterprise-oriented
+Provide:
+
+Application Maturity Score: X/10
+
+Explain the evidence.
+
+============================================================ SECTION 5 — PROPRIETARY / ORIGINAL CODE ASSESSMENT ============================================================
+
+Determine how much of the repository represents original implementation.
+
+Analyze:
+
+First-party source code
+Third-party libraries
+Open-source dependencies
+Vendored source
+Generated source
+Templates
+Boilerplate
+Copied code
+External assets
+Images
+Fonts
+Icons
+Sample data
+Example code
+Separate:
+
+ORIGINAL IMPLEMENTATION
+
+from
+
+THIRD-PARTY / EXTERNAL MATERIAL
+
+Do not claim legal ownership.
+
+Instead report:
+
+Original implementation: LOW / MODERATE / HIGH / VERY HIGH
+
+Explain why.
+
+============================================================ SECTION 6 — THIRD-PARTY DEPENDENCY & ASSET AUDIT ============================================================
+
+This section is critical because the vendor specifically asks for confirmation regarding third-party dependencies or images that the submitter does not own.
+
+Inspect:
+
+Package managers
+Dependency files
+Lock files
+Maven/Gradle dependencies
+npm dependencies
+Python dependencies
+CocoaPods
+Swift Package Manager
+Go modules
+Rust crates
+Native dependencies
+Git submodules
+Vendored source
+Images
+Fonts
+Icons
+Logos
+Audio
+Video
+Sample datasets
+Other external assets
+For every significant dependency or asset determine:
+
+Name
+Version
+Purpose
+Source
+License if detectable
+Whether it appears third-party
+Whether it is source code or runtime dependency
+Whether ownership can be established from repository evidence
+IMPORTANT:
+
+Do not state:
+
+"There are no third-party dependencies"
+
+unless this has actually been verified.
+
+Instead state one of:
+
+No third-party dependencies identified
+Third-party dependencies identified
+Third-party dependencies exist but appear permissible
+Ownership/license status requires verification
+Unable to fully determine
+Provide:
+
+Third-Party Dependency Risk: LOW / MEDIUM / HIGH / UNKNOWN
+
+============================================================ SECTION 7 — PII & SENSITIVE INFORMATION AUDIT ============================================================
+
+Perform a repository-level scan for potentially sensitive information.
+
+Look for:
+
+API keys
+Access tokens
+Passwords
+Private keys
+Certificates
+Secrets
+Database credentials
+Authentication tokens
+Personal email addresses
+Phone numbers
+Physical addresses
+User IDs
+Customer information
+Medical information
+Financial information
+Internal URLs
+Internal infrastructure information
+Cloud credentials
+Environment secrets
+Configuration containing sensitive values
+Also inspect:
+
+Git history
+Old commits
+Deleted files
+Configuration files
+Environment files
+Test fixtures
+Sample data
+Logs
+Documentation
+IMPORTANT:
+
+A secret removed from the current source may still exist in Git history.
+
+Minimum gate scan (current tree): private-key headers, keystores and signing files, credential literals, .env files, sample data dumps, and third-party data files. State explicitly whether Git history was scanned (e.g., with gitleaks or trufflehog); if it was not, report Historical Sensitive Information as UNKNOWN.
+
+Report:
+
+Current Sensitive Information Findings: NONE / FOUND / UNKNOWN
+
+Historical Sensitive Information: NONE / FOUND / UNKNOWN
+
+Potential PII: NONE / FOUND / UNKNOWN
+
+Potential Security Secrets: NONE / FOUND / UNKNOWN
+
+List findings with file paths and commit references where appropriate.
+
+DO NOT reproduce actual secrets in the report.
+
+Mask them.
+
+============================================================ SECTION 8 — GIT HISTORY, CHANGES & COMMITS ============================================================
+
+The vendor requires repositories to include history, changes, and commits.
+
+Analyze:
+
+First commit
+Latest commit
+Total commits
+Development period
+Commit frequency
+Commit distribution
+Commit sizes
+Branches
+Merge commits
+Tags
+Refactoring commits
+Feature commits
+Bug-fix commits
+Test commits
+Dependency updates
+Architectural changes
+Analyze commit messages:
+
+Specificity
+Consistency
+Generic messages
+Repeated messages
+Feature-oriented messages
+Bug-fix patterns
+Refactoring patterns
+Determine whether the history demonstrates meaningful software development.
+
+Provide:
+
+Git History Quality: X/10
+
+Explain why.
+
+============================================================ SECTION 9 — PULL REQUEST ANALYSIS ============================================================
+
+If pull request information is available, inspect:
+
+Number of PRs
+PR titles
+PR descriptions
+PR size
+Review comments
+Reviewer activity
+Requested changes
+Review iterations
+Merge history
+Feature branches
+Relationship between PRs and commits
+Provide:
+
+PR / Code Review Maturity: X/10
+
+If PR information is not available, state:
+
+"Pull request information was not available for this repository."
+
+Do NOT invent PR information.
+
+============================================================ SECTION 10 — TESTING & COVERAGE ============================================================
+
+Inspect:
+
+Unit tests
+Integration tests
+End-to-end tests
+UI tests
+Functional tests
+Performance tests
+Security tests
+Test utilities
+Fixtures
+Mocks
+Test data
+Failure-path tests
+Edge-case tests
+Determine:
+
+Test LOC Test/source ratio Coverage report availability Actual measured coverage, if available
+
+IMPORTANT:
+
+Never invent test coverage.
+
+If coverage cannot be measured, say:
+
+"Measured test coverage was not available."
+
+Then provide:
+
+Testing Maturity Score: X/10
+
+============================================================ SECTION 11 — CODE QUALITY & READABILITY ============================================================
+
+Analyze:
+
+Naming
+Structure
+Formatting
+Consistency
+Function size
+Class responsibility
+Abstraction
+Duplication
+Error handling
+Documentation
+Comments
+Maintainability
+Technical debt
+Code smells
+Separation of concerns
+Provide:
+
+Code Quality Score: X/10
+
+Readability Score: X/10
+
+Maintainability Score: X/10
+
+Support the scores with concrete examples.
+
+============================================================ SECTION 12 — AI-GENERATED CODE LIKELIHOOD ============================================================
+
+Assess whether the repository shows indicators of AI-generated or heavily AI-assisted development.
+
+Do not conclude AI generation simply because:
+
+Code is clean
+Code is modern
+Code is consistent
+Tests are extensive
+Architecture is systematic
+Analyze multiple independent signals.
+
+
+GIT SIGNALS
+
+
+Analyze:
+
+Commit timestamps
+Commit frequency
+Large commits
+Sudden codebase expansion
+Commit message patterns
+Generic commit messages
+Development chronology
+Relationship between implementation complexity and commit history
+
+SOURCE CODE SIGNALS
+
+
+Analyze:
+
+Repetitive patterns
+Naming patterns
+Comment style
+Documentation style
+Boilerplate
+Error handling
+Abstraction patterns
+Over-engineering
+Similar implementations
+Test-generation patterns
+Unusual uniformity
+Inconsistency across generated sections
+
+HUMAN DEVELOPMENT SIGNALS
+
+
+Look for:
+
+Organic refactoring
+Specific bug fixes
+Incremental changes
+Domain-specific decisions
+Manual debugging patterns
+Evolving architecture
+Developer-specific conventions
+Gradual test development
+
+AI SCORE
+
+
+Provide:
+
+AI Code Likelihood Score: X/10
+
+Interpretation:
+
+1–2 = Very little evidence 3–4 = Weak evidence 5–6 = Moderate / inconclusive 7–8 = Strong evidence 9–10 = Very strong evidence
+
+Separate:
+
+Strong Evidence Moderate Evidence Weak Evidence Evidence Against Inconclusive Evidence
+
+Do not identify a specific AI coding tool unless there is direct evidence.
+
+============================================================ SECTION 13 — DEEP TECHNICAL COMPLEXITY ANALYSIS ============================================================
+
+Now analyze the actual technical complexity.
+
+DO NOT use LOC as the primary complexity measure.
+
+
+13.1 ARCHITECTURE
+
+
+Analyze:
+
+Architecture style
+Layers
+Modules
+Dependency direction
+Coupling
+Cohesion
+Extensibility
+Abstraction
+Architectural trade-offs
+Identify actual patterns such as:
+
+Clean Architecture
+Hexagonal
+Layered
+Modular monolith
+Microservices
+Event-driven
+Plugin architecture
+MVVM
+MVI
+DDD
+Other patterns
+Only identify patterns supported by actual implementation.
+
+Architecture Complexity: X/10
+
+
+13.2 MODULE COMPLEXITY
+
+
+For each major module:
+
+Purpose
+Responsibilities
+Dependencies
+Important classes
+Important interfaces
+Algorithms
+Integrations
+Business importance
+Identify the most technically difficult modules.
+
+Module Complexity: X/10
+
+
+13.3 ALGORITHMIC COMPLEXITY
+
+
+Identify actual technically difficult algorithms.
+
+Analyze:
+
+Data processing
+Searching
+Filtering
+Scheduling
+Synchronization
+State management
+Caching
+Optimization
+Serialization
+Parsing
+Encryption
+Queue processing
+Concurrency
+Data consistency
+For every major algorithm explain:
+
+What it does
+Why it is difficult
+How it is implemented
+Edge cases
+Performance
+Reimplementation difficulty
+Do not classify ordinary CRUD as a complex algorithm.
+
+Algorithm Complexity: X/10
+
+
+13.4 BUSINESS LOGIC
+
+
+Analyze:
+
+Business rules
+Rule interactions
+State transitions
+Validation
+Workflows
+Permissions
+Domain-specific behavior
+Cross-module dependencies
+Error conditions
+Data consistency
+Business Logic Complexity: X/10
+
+
+13.5 CONCURRENCY / ASYNC
+
+
+Analyze:
+
+Threads
+Coroutines
+Async operations
+Background jobs
+Queues
+Locks
+Synchronization
+Race conditions
+Transactions
+Event processing
+Concurrency Complexity: X/10
+
+
+13.6 DATABASE / DATA
+
+
+Analyze:
+
+Schema
+Relationships
+Queries
+Indexes
+Transactions
+Migrations
+Caching
+Consistency
+Persistence
+Data processing
+Data Complexity: X/10
+
+
+13.7 NETWORKING / INTEGRATIONS
+
+
+Analyze:
+
+APIs
+External services
+Authentication
+Serialization
+Retries
+Timeouts
+Error handling
+Synchronization
+Third-party integrations
+Integration Complexity: X/10
+
+
+13.8 SECURITY
+
+
+Analyze actual implementations of:
+
+Authentication
+Authorization
+Encryption
+Token management
+Secure storage
+API security
+Input validation
+Rate limiting
+Sessions
+Audit logging
+Security Complexity: X/10
+
+
+13.9 SCALABILITY / PERFORMANCE
+
+
+Analyze:
+
+Time complexity
+Memory usage
+Database access
+Caching
+Concurrency
+Resource management
+Bottlenecks
+Large datasets
+Request volume
+Horizontal scaling
+Vertical scaling
+Scalability Complexity: X/10
+
+
+13.10 INFRASTRUCTURE / BUILD
+
+
+Analyze:
+
+Build system
+Dependency management
+CI/CD
+Environment configuration
+Code generation
+Infrastructure
+Logging
+Monitoring
+Release configuration
+Infrastructure Complexity: X/10
+
+
+13.11 TESTING COMPLEXITY
+
+
+Evaluate how difficult the system is to test due to:
+
+Number of components
+Integration boundaries
+External services
+Async behavior
+State management
+Database interaction
+Failure scenarios
+Testing Complexity: X/10
+
+============================================================ SECTION 14 — TECHNICAL COMPLEXITY SCORE ============================================================
+
+Calculate a final Technical Complexity Score using the default weighting below. LOC, repository size, number of files, number of dependencies, and number of classes must NOT directly contribute to this score. Score each category against the anchors and the 9–10 evidence rule in Section 17.2.
+
+Architecture: 15% Algorithms: 15% Business Logic: 15% Modules: 10% Concurrency/Async: 10% Database/Data: 10% Networking/Integrations: 10% Security: 5% Scalability/Performance: 5% Infrastructure/Build: 3% Testing Complexity: 2%
+
+Total = 100%
+
+Show the mathematical calculation for every category.
+
+Example: Architecture: 8.5 × 15% = 1.275 Algorithms: 8.0 × 15% = 1.200 [Continue for all categories.]
+
+Technical Complexity Score = Sum of weighted category scores, reported to two decimal places out of 10.
+
+Interpretation: 1–2 = Very Simple 3–4 = Low 5–6 = Moderate 7 = High 8 = Very High 9 = Advanced / Enterprise 10 = Exceptional
+
+Calculate this score before commercial valuation. Do not raise it merely because the repository is large. A large repository can have low complexity; a smaller repository can have high complexity.
+
+============================================================ SECTION 15 — DEVELOPMENT EFFORT ============================================================
+
+Estimate the effort required to reproduce the application from scratch.
+
+Do not simply convert LOC to time.
+
+Consider:
+
+Architecture
+Requirements discovery
+Algorithms
+Business logic
+Integration
+Database
+Security
+Testing
+Debugging
+Infrastructure
+Documentation
+Refactoring
+Performance optimization
+Estimate:
+
+Junior developer: X person-months
+
+Mid-level developer: X person-months
+
+Senior developer: X person-months
+
+Senior/architect-led team: X person-months
+
+Then provide:
+
+Estimated realistic team: X developers
+
+Estimated calendar duration: X–X months
+
+Estimated total engineering effort: X person-months
+
+Cross-check the estimate against the productivity bands below (conventional, non-AI-assisted development, applied to effective LOC L from Section 17.1):
+
+Technical Complexity (C)
+Productivity band
+C < 5
+1,500–2,500 LOC per person-month
+5 ≤ C < 7
+1,000–1,800 LOC per person-month
+C ≥ 7
+700–1,200 LOC per person-month
+Development effort is a sanity check only. It is never a price input: repository purchase prices are a small fraction of conventional reproduction cost, and AI-assisted development decouples effort from LOC and history.
+
+============================================================ SECTION 16 — VENDOR QUALIFICATION SCORE ============================================================
+
+Create a separate Vendor Qualification Score from 0–10. This measures how closely the repository matches the vendor's stated requirements; it is NOT the same as Technical Complexity or the commercial valuation score.
+
+Evaluate:
+
+Repository Size Eligibility
+Application Maturity
+Executability
+End-to-End Completeness
+Originality
+Code Quality
+Readability
+Code Completeness
+Git History
+PR/Review Maturity
+Testing Maturity
+Reusability
+Provide a transparent scoring method and explain each component. Default method: the mean of size eligibility (10 if PASS), end-to-end, executability, application maturity, originality (VERY HIGH 9 / HIGH 7.5 / MODERATE 5 / LOW 3), code quality, git history, and testing, using the sub-scores from Section 17.4. The Vendor Qualification Score informs the recommendation; it is not a price input. Do not count unknown evidence as a confirmed pass. Where a required component is unknown, flag the uncertainty and explain how it affects the overall qualification score.
+
+Vendor Qualification Score: X/10
+
+============================================================ SECTION 17 — COMMERCIAL VALUATION: EFFECTIVE LOC, ENGINEERING SCORE & EVIDENCE FLAGS ============================================================
+
+Maximum vendor repository offer: $50,000 USD.
+
+Use the following calibrated internal valuation model. It is dynamic and continuous: effective LOC (L) determines a smooth LOC Size Factor; technical complexity (C) and maturity/readiness (M) determine a nonlinear Engineering Quality Multiplier; two binary evidence flags apply fixed multipliers; the result is capped at $50,000. There are no fixed LOC tiers, LOC-based valuation ceilings, or stepwise multipliers.
+
+Final Estimated Commercial Value:
+
+V = min( $50,000 , $50,000 × LOCf(L) × EngMult(E) × A )
+
+where:
+
+L = effective LOC (Section 17.1)
+LOCf(L) = min(1, 1.2 × L / (L + 100,000)) (Section 17.3)
+C = Technical Complexity Score (Sections 14 and 17.2)
+M = Maturity and Commercial Readiness Score (Section 17.4)
+E = (C × 0.70) + (M × 0.30) and EngMult(E) = 1 − (1 − E / 10)² (Section 17.5)
+A = 0.5726^NoRealTests × 0.6234^LegacyStack (Section 17.7)
+All constants are fixed. Do not re-fit, tune, or change any parameter for an individual repository, and do not adjust L, scores, or flags to reach a desired value. Determine every input from repository evidence before computing the value.
+
+The formula is a proposed internal estimation model, not a confirmed vendor formula or universal market-pricing standard. Do not describe it as the vendor's actual policy unless the vendor confirms it.
+
+If the vendor supplies its own scoring rules, use the vendor's rules and clearly distinguish them from this proposed model. Do not confuse eligibility with value, LOC with technical complexity, repository size with maturity, or estimated value with a guaranteed purchase price.
+
+
+17.1 — ELIGIBILITY GATE AND EFFECTIVE LOC (L)
+
+
+Effective LOC (L) is handwritten, first-party, non-duplicated production implementation. It is the only size input to the valuation. Do not treat all physical lines of code as equally valuable.
+
+Count only git-tracked files (git ls-files); git-ignored build output is then excluded automatically. Use a reproducible counter such as cloc with explicit per-category file lists, and record the tool version, options, and every manual inclusion or exclusion.
+
+LINE CATEGORIES
+
+Category
+Counted in L?
+Production logic in general-purpose languages
+Yes, weight 1.0
+Authored UI markup: layouts, menus, navigation graphs, storyboards/xibs, CSS/SCSS/LESS, HTML, report templates
+Yes, weight 0.5
+Test code
+No. Report separately; credited through the Testing sub-score (17.4) and the NoRealTests flag (17.7)
+Generated code: codegen outputs, generator-script outputs, generated models or clients, schema or graph exports
+No
+Third-party or vendored source copied into the tree
+No
+Build artifacts and binaries (.apk, .aab, .jar, .aar, .dill, snapshots, minified bundles)
+No
+Data embedded in source (country, timezone or string tables, mock data)
+No
+Duplicated copies (identical files, copied service cores, forked app variants)
+Counted once
+Translations and locale resources, images, fonts and other assets, lockfiles, JSON/YAML/CSV data, configuration, documentation
+No
+Build scripts, CI, ops and tooling scripts
+No
+MECHANICAL CLASSIFICATION RULES
+
+Apply these in order to the repository-relative paths returned by git ls-files:
+
+Copy
+EXCLUDE_DIRS (^|/)(node_modules|\.dart_tool|build|Pods|Carthage|DerivedData|dist|\.next|out|
+projectFilesBackup|\.idea|\.vscode|\.gradle|release|intermediates|libs|google_fonts|
+schemas|graphify-out|generated|coverage|vendor|venv|\.venv|__pycache__|\.cxx|captures|
+bin|obj|target|ephe|build-logic|buildSrc|\.github|fastlane|\.kiro|\.claude)(/|$)
+^([^/]+/)?([Ss]cripts|[Tt]ools?|tooling|Docker|docker)/ (tooling at depth ≤ 1)
+^[^/]+\.(py|sh|rb|js|mjs|cjs)$ (repository-root scripts)
+<dir of each pubspec.yaml>(ios|android|macos|windows|linux|web)/ (Flutter runners)
+EXCLUDE_GEN (\.freezed\.dart|\.g\.dart|\.gr\.dart|\.mocks\.dart|\.config\.dart|\.min\.js|\.min\.css|
+package-lock\.json|yarn\.lock|pnpm-lock\.yaml|next-env\.d\.ts|Package\.swift|
+\.gradle|\.gradle\.kts|\.config\.(js|cjs|mjs|ts))$
+(^|/)migrations/[0-9]{4}_[^/]*\.py$ (framework-generated migrations)
+TEST (^|/)(test|tests|androidTest|androidTests|testDebug|testRelease|__tests__|
+integration_test|testFixtures)(/|$) | (^|/)[^/]*Tests(/|$) |
+\.(test|spec)\.(ts|tsx|js|jsx|mjs)$ | _test\.dart$ | (^|/)test_[^/]*\.py$ |
+(^|/)tests\.py$ | (^|/)conftest\.py$
+LOGIC \.(java|kt|swift|m|mm|dart|ts|tsx|js|jsx|mjs|cjs|py|sql|c|cc|cpp|cxx|h|hpp|go|rs|cs|
+rb|php|lua|proto|groovy)$
+SQL_DATA (sample|seed|dump|fixture|demo)[^/]*\.sql$ | /(sample-data|sample_data|seed|seeds|fixtures)/
+VENDORED (^|/)(third_party|ThirdParty|thirdparty|Vendor|vendored)(/|$), plus any directory or
+package root confirmed as copied third-party source (see the foreign-package check)
+MARKUP res/(layout|menu|navigation)[^/]*/[^/]*\.xml$ |
+\.(storyboard|xib|css|scss|sass|less|html|htm|jrxml)$
+
+SUPPLEMENTARY CHECKS (confirm each by reading the files):
+
+Foreign packages: list JVM package roots (or the equivalent namespaces) by line count. Any root not owned by the repository is vendored source and is excluded.
+Embedded data: flag files of 300 or more code lines in which at least 70% of non-blank lines contain a string literal. Confirm by reading before excluding.
+Generator scripts: if the repository contains scripts that write source files, identify and exclude their outputs.
+Recognizable generated models, e.g., POJOs with sequentially numbered fields and serialization annotations.
+Test-pattern review: list the directories classified as tests. Production packages whose names merely contain "Test" (for example a medical-test feature) are not tests.
+DUPLICATE RULES
+
+D1, normalized content duplicates (all repositories): files of 10 or more code lines whose content is identical after removing whitespace and package/import lines count once.
+D2, sibling copies (multi-module repositories):Microservices sharing a package root: a file with the same package-relative path in two or more sibling services counts once, at its largest copy.
+Declared variant forks of one application (evidence: shared class sets, merged histories): a class name present in several forks counts once, at its largest copy. Fork-only classes count in full.
+Where D1 and D2 overlap, use the larger reduction. Never subtract the same lines twice.
+EFFECTIVE LOC FORMULA
+
+L = Logic − EmbeddedData − Generated − Duplicates + 0.5 × Markup
+
+Logic is the code lines of LOGIC files remaining after the exclusion, test, vendored and SQL_DATA rules. Markup is the code lines of non-vendored MARKUP files after duplicate removal.
+
+Residual boilerplate inside authored files (DTOs, repetitive routes, CRUD screens, very large page components) stays in L. It is reflected through the complexity and code-quality scores, not removed by judgment.
+
+Report these categories separately:
+
+Raw tracked code (all languages, cloc --vcs=git)
+Production logic LOC, by language
+Vendored / third-party LOC (excluded)
+Test LOC (excluded) and the test-to-production ratio
+Embedded data LOC (excluded)
+Generated LOC (excluded)
+Duplicated LOC (excluded; rule D1 or D2)
+Authored markup LOC (raw → × 0.5)
+Configuration and documentation LOC (excluded)
+Effective LOC (L)
+Do not assume that using a dependency makes its source first-party code. Runtime dependencies may be reported separately even when they are not physically copied into the repository. Audit dependency and asset licences and ownership separately under Sections 5–6. Exclude code the submitter does not own or is not authorized to submit. If ownership or classification is uncertain, flag it and exclude the uncertain lines from L until verified. If categories cannot be reliably separated, report UNKNOWN / NOT VERIFIED; do not invent a count.
+
+Vendor size eligibility:
+
+PASS: 1,000 ≤ L ≤ 500,000.
+FAIL: L is outside that range.
+UNKNOWN / NOT VERIFIED: L cannot be reliably measured or the counting basis is unclear.
+The vendor's exact LOC-counting methodology is UNKNOWN unless supplied. State that vendor confirmation may be needed if its counting method differs. Eligibility does not guarantee acceptance or a particular price.
+
+
+17.2 — TECHNICAL COMPLEXITY SCORE (C)
+
+
+Use the Technical Complexity Score calculated in Section 14 (the same eleven categories and weights). Calculate and justify it before commercial valuation. Score each Section 13 category from 1 to 10 against these anchors:
+
+Category
+Weight
+Low (1–3)
+Moderate (4–6)
+High (7–8)
+Exceptional (9–10)
+Architecture
+15%
+Monolithic god classes
+Conventional layered or MVVM
+Clean or modular with enforced boundaries; microservices
+Multi-package or multi-service with enforced policy and extensions
+Algorithms
+15%
+CRUD only
+Standard parsing and calculations
+Correctness-critical math, protocol parsing, computer vision
+Original or from-scratch primitives (e.g., a memory-hard KDF implemented from the RFC), scientific-grade computation
+Business logic
+15%
+Forms and lists
+Multi-entity workflows
+Rule engines, approval chains
+Deep regulated-domain rules (payroll, tax, statutory, clinical)
+Modules
+10%
+One module
+Several packages
+Many cohesive modules
+Large modular system with clean dependency direction
+Concurrency / async
+10%
+None, or deprecated async helpers
+Callbacks, basic async
+Coroutines or Flow, reactive streams, schedulers, queues
+Actors or strict concurrency, reactive gateways, guaranteed background work
+Database / data
+10%
+Preferences or files only
+Simple local database
+Many entities, migrations, transactions
+Encrypted stores, schema-per-tenant, multi-datasource ETL with reconciliation
+Networking / integrations
+10%
+None
+A few SDKs
+Payments, OAuth, messaging
+Many external systems, including hardware or binary protocols and scraping
+Security
+5%
+None
+App lock, basic authentication
+OAuth2 server, token introspection, rate limiting
+Hardware-backed key hierarchies, crypto-bound biometrics, memory-hard KDFs
+Scalability / performance
+5%
+Not applicable
+Basic caching
+Rate limiting, database per service
+Proven high-scale design
+Infrastructure / build
+3%
+Default build
+Flavours, Docker
+CI, convention plugins, environment matrices
+Enforced build policy plus full containerization
+Testing complexity
+2%
+Isolated units
+Some boundaries
+Many integration boundaries
+Distributed and asynchronous systems
+Rule against inflation: a category score of 9–10 requires demonstrated difficulty cited to specific files, such as an original algorithm, a correctness-critical calculation, a from-scratch cryptographic primitive, a hardware or binary protocol, or genuine distributed coordination. Breadth alone earns at most 8 on Modules.
+
+LOC, file count, dependency count, class count, and module count must not directly increase technical complexity. Complexity must reflect actual engineering difficulty: architecture, algorithms, business logic, concurrency, data, integrations, security, scalability, infrastructure, and testing.
+
+C = Σ (category score × weight), reported to two decimal places.
+
+
+17.3 — CONTINUOUS LOC SIZE FACTOR (LOCf)
+
+
+Do not use fixed LOC tiers, valuation ceilings by LOC band, or stepwise multipliers. The LOC contribution is calculated continuously from effective LOC (L), so small differences in L produce gradual changes rather than sudden jumps at arbitrary thresholds.
+
+Let:
+
+L = effective LOC (Section 17.1).
+L_MAX = 500,000, the upper end of the stated vendor size range.
+K = 100,000, the half-saturation parameter of the curve.
+LOC Size Factor:
+
+LOCf(L) = min( 1 , [L / (L + K)] / [L_MAX / (L_MAX + K)] ) = min( 1 , 1.2 × L / (L + 100,000) )
+
+The factor equals 1.0000 at L = 500,000, changes continuously below it, and stays at 1.0000 above it. Use L, never raw or total repository LOC. Do not round intermediate values; report the factor to four decimal places.
+
+Reference values (factor only, not valuation bands):
+
+L
+7,000
+10,000
+50,000
+100,000
+150,000
+200,000
+300,000
+500,000
+LOCf
+0.0785
+0.1091
+0.4000
+0.6000
+0.7200
+0.8000
+0.9000
+1.0000
+Returns diminish with size: doubling L from 150,000 to 300,000 raises the factor by 25%, not 100%; going from 300,000 to 500,000 adds 11%; beyond 500,000 adds nothing.
+
+If L is unknown, the factor is UNKNOWN / NOT VERIFIED. If L is outside 1,000–500,000, report that the repository fails the stated size eligibility requirement; any calculated amount must be clearly labelled conditional and must not imply eligibility.
+
+
+17.4 — MATURITY AND COMMERCIAL READINESS SCORE (M)
+
+
+M is the weighted sum of eight sub-scores, each scored from 0 to 10 using the evidence in the named section:
+
+Sub-score
+Weight
+Source
+Rubric
+End-to-end completeness
+20%
+Section 3
+9–10 complete system with all flows wired (classification A) · 7–8 complete apart from external services (B) · 5–6 key flows stubbed or bypassed (C) · ≤ 4 fragments, scripts, or prototypes (D–G)
+Executability
+15%
+Section 3 (Executability)
+8 full build plumbing, reproducible · 6–7 runnable only with external pieces or pre-GA toolchains · 4–5 misconfiguration (e.g., debug mode enabled in production settings, missing signing setup) · ≤ 3 cannot run. If nothing was built, score the plumbing and state "not executed"
+Application maturity
+15%
+Section 4
+Residual production readiness only: error handling, validation, migrations, configuration, logging and monitoring, recovery. 9 robust · 6–7 good with gaps · 4–5 significant defects (e.g., at-rest encryption disabled, schema managed without migrations) · ≤ 3 critical defects (e.g., paid entitlement granted without charging). Do not reuse the overall Section 4 score here, because testing, quality and history have their own sub-scores
+Testing
+15%
+Section 10
+9–10 substantive unit plus integration or instrumented tests, test-to-production ratio ≥ 10% · 7–8 substantive tests, 5–10% · 5–6 real tests on critical helpers, 2–5% · 3–4 a few real tests, < 2% · 1–2 no tests or IDE-template stubs only
+Code quality
+15%
+Section 11
+Mean of Code Quality, Readability and Maintainability. 9 exemplary · 7 good · 5 mixed · ≤ 4 legacy god classes, forked copies, dead code
+Git history
+10%
+Section 8
+9–10: ≥ 500 commits, ≥ 250 active (distinct) commit days and ≥ 3 authors · 7–8: ≥ 200 commits and ≥ 80 active days · 5–6: ≥ 100 commits or ≥ 40 active days · 3–4: ≥ 20 commits and ≥ 10 active days · 1–2: below that
+PR / review
+5%
+Section 9
+Score only when PR evidence exists: 5 if PRs were merged but review content is not visible, up to 10 with visible review iterations. Plain merge commits are not PR evidence
+Documentation
+5%
+Sections 4 and 11
+8 thorough setup, run and architecture documentation · 6 adequate · 3 minimal · 1 none
+M = Σ (sub-score × weight). When pull-request evidence is unavailable, drop its 5% weight and divide the weighted sum by 0.95. Never score a missing data source as zero, and never count unknown evidence as a pass.
+
+Maturity class (from M): < 3 Prototype · 3–4.5 Early-stage · 4.5–6 Intermediate · 6–7.5 Mature · ≥ 7.5 Highly mature / enterprise-oriented.
+
+Explain every sub-score with evidence. Do not invent test coverage, ownership, runtime success, PR history, or other evidence. Each item of evidence is scored once, in one sub-score.
+
+If evidence is insufficient for a sub-score, mark it UNKNOWN / NOT VERIFIED and state how that affects M. Do not silently substitute a score. A conditional example may be provided only when assumptions are explicitly labelled.
+
+
+17.5 — ENGINEERING SCORE AND QUALITY MULTIPLIER
+
+
+Calculate C (Section 17.2) and M (Section 17.4) before the commercial valuation. LOC, file count, dependency count, class count, and module count must not directly increase either score.
+
+Engineering Score: E = (C × 0.70) + (M × 0.30)
+
+Engineering Quality Multiplier: EngMult(E) = 1 − (1 − E / 10)²
+
+Both input scores are between 0 and 10, so E is between 0 and 10 and EngMult is between 0 and 1. Technical complexity has the larger influence; maturity/readiness adjusts for evidence of completeness and commercial usability.
+
+Reference values: E = 2 → 0.36 · E = 4 → 0.64 · E = 6 → 0.84 · E = 8 → 0.96 · E = 10 → 1.00. Raising E from 6 to 10 increases value by at most 19%. Complexity cannot multiply value arbitrarily and cannot rescue a small L.
+
+If either input is UNKNOWN / NOT VERIFIED, the Engineering Score and final valuation are UNKNOWN / NOT VERIFIED. A conditional scenario may be shown only when its assumed inputs are stated clearly.
+
+
+17.6 — BASE COMMERCIAL VALUE
+
+
+Use a continuous formula. Do not create a LOC-tier table, assign a fixed ceiling to a LOC band, or apply a stepwise LOC multiplier.
+
+Base Value = $50,000 × LOCf(L) × EngMult(E)
+
+Equivalently: Base Value = $50,000 × min(1, 1.2 × L / (L + 100,000)) × (1 − (1 − ((C × 0.70) + (M × 0.30)) / 10)²)
+
+Every factor is at most 1, so Base Value / $50,000 ≤ min(LOCf, EngMult). A high engineering score cannot rescue a small codebase, and a large codebase cannot rescue weak engineering. Neither LOC nor complexity alone determines value.
+
+Model behaviour without flags, for checking calculations only (conditional model outputs, not offers):
+
+L
+E = 4 (×0.64)
+E = 6 (×0.84)
+E = 8 (×0.96)
+E = 9 (×0.99)
+E = 10 (×1.00)
+10,000
+$3,491
+$4,582
+$5,236
+$5,400
+$5,455
+50,000
+$12,800
+$16,800
+$19,200
+$19,800
+$20,000
+150,000
+$23,040
+$30,240
+$34,560
+$35,640
+$36,000
+300,000
+$28,800
+$37,800
+$43,200
+$44,550
+$45,000
+500,000
+$32,000
+$42,000
+$48,000
+$49,500
+$50,000
+Calibration anchors (C = M = 8, no flags): 7,000 → $3,768 · 150,000 → $34,560 · 300,000 → $43,200 · 500,000 → $48,000.
+
+Examples:
+
+Small but complex: 7,000 effective LOC at C = 9, M = 8 gives $3,859. A small codebase stays small.
+Large but simple: 300,000 effective LOC at C = 3, M = 4 gives $24,800. The multiplier holds it down.
+If L is unknown, or either required score is unknown, do not invent a final value. Report the missing input and provide a conditional calculation only when assumptions are explicitly labelled. If the repository is outside the stated LOC eligibility range, label any amount conditional and separately report FAIL for eligibility.
+
+
+17.7 — EVIDENCE FLAGS (FIXED CALIBRATED MULTIPLIERS)
+
+
+Two binary evidence flags are the only price adjustments. Assign each one by its definition, cite the evidence, and never apply a flag partially.
+
+NoRealTests = 1 (multiplier × 0.5726) when the repository has no automated tests, or only IDE- or template-generated stubs (e.g., an untouched ExampleUnitTest); that is, a Testing sub-score of 2 or less. Any real test suite with meaningful assertions, even a small one, clears the flag. Placeholder tests written only to clear the flag do not count.
+
+LegacyStack = 1 (multiplier × 0.6234) when at least 2 of these 4 criteria hold:
+
+The primary UI or framework idioms are deprecated by the platform vendor (e.g., ButterKnife, AsyncTask, the Android Support Library, Fabric SDK, or the equivalent on other platforms).
+The target platform API level is 3 or more years behind current at the assessment date.
+The majority of screens have no lifecycle-aware state architecture (MVVM, MVI, Redux, Bloc, or equivalent).
+Most production code is in a language the platform has superseded (Java on Android, Objective-C on iOS). Server-side Java, C#, Python and similar languages are not superseded.
+Flag multiplier:
+
+A = 0.5726^NoRealTests × 0.6234^LegacyStack
+
+No flags → 1.0000 · NoRealTests only → 0.5726 · LegacyStack only → 0.6234 · both → 0.3570
+
+These multipliers measure the additional value effect beyond the Testing and Code Quality sub-scores already inside M. They were calibrated net of those sub-scores, so applying both the sub-score and the flag is not double counting.
+
+Do NOT apply any other percentage adjustment, premium, or discount. Other factors are handled once, elsewhere:
+
+Factor
+Where it is handled
+Duplicated, vendored or generated code; embedded data
+Excluded from L (17.1)
+Disabled security in a sensitive domain, stubbed flows, missing migrations
+M: application maturity and end-to-end sub-scores (17.4)
+Thin or burst history
+M: git history sub-score (17.4)
+Secrets, PII, licence or ownership doubts, bundles of unrelated products
+Gates (17.8): they change the recommendation, not the value
+AI-generated code likelihood (Section 12)
+Value-neutral
+High LOC
+LOCf only; never a premium
+Out-of-calibration overlay: use only for a material, verified issue outside the model's scope, such as verified copyleft contamination of first-party code or code that provably cannot be built. The default is 1.0. Label it UNCALIBRATED, cite the evidence, report it separately from the model value, and never use it to increase value.
+
+
+17.8 — GATES, FINAL VALUE AND VENDOR CAP
+
+
+Gates do not change the value. They are remediation preconditions that determine the recommendation (Section 23). The estimated value assumes every open gate is remediated before submission.
+
+G1 Secrets / PII: private keys, signing keystores, live credentials, tokens, or personal data in the tree or in history (Section 7). Remove, rotate, and purge history.
+G2 Licence / ownership: vendored source, binaries, data files, or assets whose licence or ownership is unverified or restrictive (Sections 5–6). Verify or remove.
+G3 Critical safety defect: e.g., paid entitlement granted without charging, health or financial data stored unencrypted at rest, an authentication bypass. Fix before submission.
+G4 Bundle: unrelated products in one repository. Split them, or follow Section 17.9.
+Final Estimated Commercial Value:
+
+V = min( $50,000 , max( $0 , Base Value × A ) )
+
+The maximum offer must never exceed $50,000 USD. If Base Value × A exceeds the cap, show both the uncapped and the capped value.
+
+Reachability: without flags, the maximum value at E = 10 is $36,000 at L = 150,000, $40,000 at L = 200,000, $45,000 at L = 300,000, and $50,000 only at L ≥ 500,000. Marginal value diminishes with size: at E = 8 it is about $0.58 per effective line at L = 0, $0.14 at L = 100,000, $0.04 at L = 300,000, $0.02 just below 500,000, and $0 beyond.
+
+This is an analytical estimate, not a guarantee, formal appraisal, or promise of vendor acceptance.
+
+
+17.9 — MULTI-REPOSITORY PRODUCTS AND BUNDLES
+
+
+Never sum the values of related repositories automatically.
+
+Situation
+Rule
+Individual repository valuation
+Value each repository alone with this model and its own $50,000 cap
+Combined product valuation
+V_product = V_largest + Σ (1 − d_i) × V_i over the other repositories. Each V_i stays individually capped
+Complementary repositories with distinct functions (backend vs clients, ETL tool vs application)
+d = 0
+Additional platform implementation of the same product (shared requirements, UX, design, test vectors)
+d = 0.25, a proposed, uncalibrated allowance for shared design effort
+Shared libraries
+Count the library once, in its own repository or in its first consumer. Remove copies from every other repository's L (D1/D2 applied across repositories)
+Duplicated implementations across repositories
+Remove from L before valuation
+Unrelated products in one repository
+Price the repository using its whole-repository L. Report per-product values separately to support a split (gate G4)
+
+17.10 — UNCERTAINTY AND CONFIDENCE
+
+
+Typical estimation error is about ±20%: mean absolute percentage error was about 16% in calibration and about 22% in leave-one-out validation. State this with every value.
+Calibration basis: 11 repositories with observed valuations; each evidence flag rests on 3 flagged repositories, so treat the flag multipliers as approximate. Sensitivity checks showed the markup weight and test credit barely change results, both flags are needed, and a smaller K would fit slightly better but breaks the anchors.
+Known bias: the model has no premium for enterprise systems of record. It tends to under-estimate very large, highly mature enterprise backends and platforms, typically by 10–30%. It reaches $50,000 only at L ≥ 500,000 with E = 10.
+Confidence rating:High: L measured with no unresolved classification, E ≥ 6, no build gaps, and a conventional web, mobile or backend profile.
+Medium: some classification judgment, E < 6, or one flag applied.
+Low: a bundle of unrelated products, an ambiguous size measure, or a profile outside the model's experience (desktop software, game engines, L > 350,000).
+List everything not verified: builds, runtime behaviour, measured coverage, git-history secret scan, licences.
+
+17.11 — REQUIRED VALUATION OUTPUT
+
+
+Report:
+
+Raw tracked code, production logic by language, and every excluded category (17.1)
+Effective LOC (L) and the counting method
+Vendor size eligibility: PASS / FAIL / UNKNOWN
+Technical Complexity Score (C), with all eleven category scores and evidence
+Maturity and Commercial Readiness Score (M), with all eight sub-scores and evidence
+LOC Size Factor (LOCf)
+Engineering Score (E) and each contribution (C × 0.70, M × 0.30)
+Engineering Quality Multiplier (EngMult)
+Base Value
+NoRealTests and LegacyStack flags with evidence, and the flag multiplier A
+Value before cap, and Final Estimated Commercial Value after cap
+Open gates (G1–G4) and the required remediation
+Conservative Offer, Recommended Offer, and Maximum Justifiable Offer (Section 18)
+Confidence rating and typical error
+All offers must be no greater than $50,000. Do not automatically set the maximum justifiable offer to $50,000. Base offers on repository evidence, state uncertainty, and distinguish facts from assumptions.
+
+============================================================ SECTION 18 — OFFER PRICE ============================================================
+
+Provide three values, all derived from the Final Estimated Commercial Value (V) in Section 17.8:
+
+Conservative Offer = 0.80 × V
+Recommended Offer = V
+Maximum Justifiable Offer = min($50,000, 1.30 × V)
+All values must be <= $50,000.
+
+The band reflects the model's empirical error distribution: about 80% of calibration outcomes fell between 0.80× and 1.30× the model value. It is asymmetric because the model under-estimates high-quality, mature systems more often than it over-estimates.
+
+
+CONSERVATIVE OFFER
+
+
+0.80 × V. A price that gives the vendor a strong negotiation position.
+
+
+RECOMMENDED OFFER
+
+
+V. The price that best represents the repository's demonstrated technical and commercial value.
+
+
+MAXIMUM JUSTIFIABLE OFFER
+
+
+min($50,000, 1.30 × V). The highest amount that can reasonably be defended from repository evidence.
+
+Do not automatically set this to $50,000. If any gate (G1–G4) is open, state that all three offers assume remediation before submission.
+
+============================================================ SECTION 19 — FINAL SCORECARD ============================================================
+
+Return:
+
+Category
+Score
+Repository Size
+X/10
+Application Maturity
+X/10
+Executability
+X/10
+End-to-End Completeness
+X/10
+Originality
+X/10
+Code Quality
+X/10
+Readability
+X/10
+Code Completeness
+X/10
+Git History
+X/10
+PR / Review Maturity
+X/10
+Testing Maturity
+X/10
+Technical Complexity
+X/10
+Scalability
+X/10
+Security
+X/10
+Reusability
+X/10
+Vendor Qualification
+X/10
+AI Code Likelihood
+X/10
+Effective LOC (L)
+X
+LOC Size Factor (LOCf)
+X.XXXX
+Maturity and Commercial Readiness (M)
+X/10
+Engineering Score (E)
+X/10
+NoRealTests Flag
+0 / 1
+LegacyStack Flag
+0 / 1
+Open Gates
+G1–G4 / none
+Valuation Confidence
+High / Medium / Low
+============================================================ SECTION 20 — FINAL COMMERCIAL CALCULATION ============================================================
+
+Show the calculation exactly and in this order.
+
+Raw Tracked Code (all languages, cloc --vcs=git): X
+
+Production Logic LOC (by language): X
+
+Vendored / Third-Party LOC (excluded): X
+
+Test LOC (excluded; test-to-production ratio): X (X%)
+
+Embedded Data LOC (excluded): X
+
+Generated LOC (excluded): X
+
+Duplicated LOC (excluded; rule D1 / D2): X / UNKNOWN
+
+Configuration and Documentation LOC (excluded): X
+
+Authored Markup LOC (raw → × 0.5): X → X
+
+Effective LOC (L): Logic − Embedded Data − Generated − Duplicates + 0.5 × Markup = X
+
+LOC Counting Method: [Tool and version, options, file lists, classification rules applied, manual inclusions and exclusions]
+
+Vendor Size Eligibility: PASS / FAIL / UNKNOWN
+
+LOC Size Factor (LOCf): min(1, 1.2 × L / (L + 100,000)) = X.XXXX
+
+Technical Complexity Score (C): Σ (category score × weight) = X.XX/10 [list all eleven category scores]
+
+Maturity and Commercial Readiness Score (M): Σ (sub-score × weight) [÷ 0.95 if no PR evidence] = X.XX/10 [list all eight sub-scores], or UNKNOWN / NOT VERIFIED
+
+Engineering Score (E): (C × 0.70) + (M × 0.30) = X.XX + X.XX = X.XX/10
+
+Engineering Quality Multiplier (EngMult): 1 − (1 − E / 10)² = X.XXXX
+
+Base Value: $50,000 × LOCf × EngMult = $XX,XXX
+
+Evidence Flags: NoRealTests = 0 / 1 [evidence] LegacyStack = 0 / 1 [criteria met, with evidence]
+
+Flag Multiplier (A): 0.5726^NoRealTests × 0.6234^LegacyStack = X.XXXX
+
+Value Before Cap: Base Value × A = $XX,XXX
+
+Maximum Vendor Price: $50,000
+
+Final Estimated Commercial Value (V): min($50,000, max($0, Value Before Cap)) = $XX,XXX
+
+Conservative Offer (0.80 × V): $XX,XXX
+
+Recommended Offer (V): $XX,XXX
+
+Maximum Justifiable Offer (min($50,000, 1.30 × V)): $XX,XXX
+
+Open Gates and Required Remediation: G1 / G2 / G3 / G4 / none [details]
+
+Confidence and Typical Error: High / Medium / Low; typical error about ±20%
+
+Do not invent LOC counts, scores, flags, multipliers, runtime success, test coverage, or history. If an input is unknown, state that a definitive calculation is not possible and provide a conditional scenario only when assumptions are explicit. Use only effective LOC (L) in the LOC Size Factor. Exclude third-party/vendored code, generated code, embedded data, duplicated copies, tests, and code the submitter does not own or is not authorized to submit. Report uncertain ownership or classification separately and do not count it until verified.
+
+============================================================ SECTION 21 — FINAL EXECUTIVE SUMMARY ============================================================
+
+Return:
+
+Repository: [Name]
+
+Size: [Effective LOC (L) = X; raw tracked code = X]
+
+Vendor Size Requirement: PASS / FAIL
+
+Application Type: [Type]
+
+Executable: YES / PARTIAL / NO
+
+End-to-End: YES / PARTIAL / NO
+
+Maturity: X/10
+
+Code Quality: X/10
+
+Code Completeness: X/10
+
+Originality: X/10
+
+Git History: X/10
+
+PR Maturity: X/10 / NOT AVAILABLE
+
+Testing: X/10
+
+AI Code Likelihood: X/10
+
+Technical Complexity: X/10
+
+Vendor Qualification: X/10
+
+Estimated Development Effort: X person-months
+
+Effective LOC (L): X
+
+LOC Size Factor (LOCf): X.XXXX
+
+Maturity and Commercial Readiness (M): X/10
+
+Engineering Score (E): X/10
+
+Base Value: $XX,XXX
+
+Evidence Flags: NoRealTests 0 / 1 · LegacyStack 0 / 1 · Flag Multiplier X.XXXX
+
+Estimated Commercial Value (V): $XX,XXX
+
+Conservative Offer: $XX,XXX
+
+Recommended Offer: $XX,XXX
+
+Maximum Justifiable Offer: $XX,XXX
+
+Open Gates: G1 / G2 / G3 / G4 / none
+
+Valuation Confidence: High / Medium / Low (typical error about ±20%)
+
+============================================================ FINAL DECISION ============================================================
+
+Answer these questions directly:
+
+Does the repository meet the vendor's size requirement?
+Is it a large repository?
+Is it a mature application?
+Is it a complete executable application?
+Is it truly end-to-end according to the vendor's definition?
+Is it more than a collection of loose scripts?
+Is it more than an incomplete codebase?
+Is the implementation substantially original?
+Does it contain third-party dependencies or assets requiring ownership/license verification?
+Does it contain potential PII or sensitive information?
+Does it contain meaningful Git history, changes, and commits?
+Are pull requests available?
+Is testing mature?
+Is the code well-written and readable?
+What are the most technically complex parts?
+What is the Technical Complexity Score?
+How difficult would it be to reproduce the application?
+What is the complexity-based value?
+What is the recommended vendor offer?
+What is the maximum justifiable offer?
+============================================================ IMPORTANT RULES ============================================================
+
+Inspect the entire repository before producing the final assessment.
+Base conclusions on actual repository evidence.
+Do not fabricate evidence.
+Do not invent PRs.
+Do not invent test coverage.
+Do not invent Git history.
+Do not invent runtime success.
+Do not claim ownership of third-party assets without evidence.
+Do not expose actual secrets discovered during scanning.
+Do not treat third-party libraries as original development.
+Do not treat generated code as equivalent to original engineering effort.
+Do not use LOC as the primary measure of technical complexity. For commercial valuation only, use effective LOC (L, Section 17.1) through the normalized continuous LOC Size Factor defined in Section 17.3. Do not use fixed LOC tiers, LOC-based valuation ceilings, or stepwise multipliers.
+Do not award complexity points merely for having many files.
+Do not automatically classify a large repository as mature.
+Do not automatically classify a repository as end-to-end.
+End-to-end means COMPLETE AND EXECUTABLE CODEBASE, not loose scripts or incomplete snippets.
+Technical Complexity must be calculated BEFORE commercial valuation.
+Technical Complexity is the largest contributor to the Engineering Score, while the continuous LOC Size Factor scales the total valuation potential. High complexity must not override a small qualifying codebase.
+Apply no premium or discount other than the two evidence flags in Section 17.7. Gates (Section 17.8) and vendor qualification affect the recommendation, not the value. Never alter model parameters or inputs to reach a desired value.
+Maximum offer is $50,000.
+Be conservative where evidence is insufficient.
+Clearly distinguish:
+
+Facts
+Evidence
+Inference
+Unknown information
+Reference concrete:
+
+File paths
+Modules
+Classes
+Functions
+Algorithms
+Commits
+PRs
+Tests
+Do not inflate the score to achieve a higher offer.
+Do not reduce the score simply because AI assistance may have been used.
+AI likelihood, technical complexity, maturity, completeness, and commercial value are separate measurements.
+The final recommended offer must be defensible from the actual repository.
+============================================================ SECTION 22 — EXECUTIVE SUMMARY ============================================================
+
+Provide a concise, decision-oriented summary for a reviewer who may not read the full technical analysis. Include:
+
+What the repository is and what complete application/system it implements.
+Whether it is demonstrably executable and end-to-end.
+Effective LOC (L), the raw tracked LOC it was derived from, and the vendor size-eligibility result.
+The strongest evidence of technical complexity and the main engineering risks.
+The maturity, originality, testing, Git history, and ownership findings that most affect qualification.
+The Technical Complexity Score, LOC Size Factor, Maturity/Readiness Score, Engineering Score, evidence flags, open gates, final estimated value, and valuation confidence, where evidence supports them.
+Any blocking unknowns that prevent a reliable valuation.
+Clearly separate verified facts from inference. Do not present an estimated value as a guaranteed offer or as the vendor's confirmed pricing policy.
+
+============================================================ SECTION 23 — FINAL RECOMMENDATION ============================================================
+
+Give one clear recommendation:
+
+SUBMIT — the repository appears to meet the key requirements and material risks have been reviewed.
+SUBMIT AFTER REMEDIATION — identify the specific work required before submission.
+DO NOT SUBMIT YET — explain the blocking gaps, such as unverified ownership, excluded or duplicated LOC, missing executable paths, severe quality issues, exposed sensitive information, or insufficient evidence.
+INSUFFICIENT EVIDENCE — use when the repository could not be assessed reliably.
+Map gates (Section 17.8) to the recommendation:
+
+No open gate → SUBMIT.
+One or more fixable gates (G1 secrets/PII, G2 licence/ownership, G3 critical safety defect) → SUBMIT AFTER REMEDIATION, listing each fix.
+Secrets spread across several products, critical safety defects together with other open gates, or G4 (a bundle of unrelated products) → DO NOT SUBMIT YET.
+Then state:
+
+Recommended offer range, if supportable.
+Recommended target offer, if supportable.
+Maximum justifiable offer under the proposed model, never above $50,000.
+The three strongest pieces of evidence supporting the recommendation.
+The three most important risks or unknowns.
+The exact next steps needed to improve submission readiness or valuation confidence.
+Do not manufacture a price when required inputs are unknown. If no defensible price can be calculated, state which evidence or review scores are missing.
+
+============================================================ ANALYZER-INFORMED EVIDENCE AND LIMITATIONS ============================================================
+
+Use automated repository-analysis output as evidence to investigate, not as unquestionable proof. The analyzer may identify languages, files, frameworks, dependencies, infrastructure, tests, repository metadata, Git history, pull requests, potential secrets, and an initial authored-LOC estimate. Cite the relevant report field and underlying repository evidence where possible.
+
+Important limitations:
+
+An automated authored-LOC result is provisional until generated code, third-party/vendored code, duplicate copies, build artifacts, and unowned or unauthorized code have been excluded.
+A repository scanner cannot establish legal ownership or submission authorization from source code alone. Require license, provenance, and ownership review where needed.
+Duplicate detection and generated-code detection are heuristic unless independently verified; describe the method and residual uncertainty.
+A categorical label such as High, Moderate, or Low is not automatically a numeric 0–10 technical-complexity score. Do not silently convert it. Score complexity from the rubric and concrete evidence in Sections 13–14.
+Detected tests or test files do not prove test coverage, test quality, or successful execution. Report observed test evidence separately from verified execution and coverage.
+Detected frameworks, dependencies, or build files do not prove the complete application builds or runs. Verify commands, environment requirements, and execution results.
+Git commit counts and pull-request metadata are evidence of repository activity, not proof of authorship, work quality, or a complete development timeline.
+Potential secret matches must be reported safely without reproducing credential values. Mark false positives and remediation status when verified.
+If the analyzer source, report, or repository scan is incomplete, state the limitation and do not imply that the entire repository was inspected.
+The final assessment must preserve all 23 requested output topics below. Do not omit or silently merge topics 21, 22, or 23.
+
+============================================================ FINAL OUTPUT ORDER ============================================================
+
+Repository Profile
+Size Eligibility
+End-to-End Assessment
+Executability Assessment
+Application Maturity
+Originality Assessment
+Third-Party Dependency & Asset Audit
+PII & Sensitive Information Audit
+Git History Analysis
+Pull Request Analysis
+Testing & Coverage
+Code Quality & Readability
+AI-Generated Code Likelihood
+Deep Technical Complexity Analysis
+Technical Complexity Score
+Development Effort
+Vendor Qualification Score
+Commercial Valuation
+Conservative / Recommended / Maximum Offers
+Final Scorecard
+Final Commercial Calculation
+Executive Summary
+Final Recommendation
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
